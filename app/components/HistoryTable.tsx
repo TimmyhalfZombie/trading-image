@@ -205,23 +205,38 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-stone-50/40 sticky top-0 z-10 border-b border-stone-50 backdrop-blur-sm">
                                 <tr>
-                                    <th className="px-8 py-4 text-[10px] font-semibold text-stone-400 uppercase tracking-widest w-1/6">Date</th>
+                                    <th className="px-6 py-4 text-[10px] font-semibold text-stone-400 uppercase tracking-widest w-1/6">Date</th>
+                                    <th className="px-6 py-4 text-[10px] font-semibold text-stone-400 uppercase tracking-widest w-1/6">Time</th>
                                     <th className="px-6 py-4 text-[10px] font-semibold text-stone-400 uppercase tracking-widest w-1/6">Asset</th>
                                     <th className="px-6 py-4 text-[10px] font-semibold text-stone-400 uppercase tracking-widest w-1/6 text-center">Signal</th>
                                     <th className="px-6 py-4 text-[10px] font-semibold text-stone-400 uppercase tracking-widest w-1/6 text-center">Confidence</th>
-                                    <th className="px-6 py-4 text-[10px] font-semibold text-stone-400 uppercase tracking-widest w-1/6 text-right">P&L</th>
                                     <th className="px-8 py-4 text-[10px] font-semibold text-stone-400 uppercase tracking-widest w-1/6 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-stone-50">
                                 {trades.map((trade) => {
-                                    const relativeTime = getRelativeTime(trade.created_at);
+                                    const dateObj = new Date(trade.created_at);
+                                    const dateStr = dateObj.toLocaleDateString(undefined, {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: '2-digit'
+                                    });
+                                    const timeStr = dateObj.toLocaleTimeString(undefined, {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: true
+                                    });
 
                                     return (
                                         <tr key={trade.id} className="group hover:bg-stone-50/40 transition-colors duration-200">
                                             {/* Date */}
-                                            <td className="px-8 py-5 text-xs font-medium text-stone-500 whitespace-nowrap">
-                                                {relativeTime}
+                                            <td className="px-6 py-5 text-xs font-medium text-stone-500 whitespace-nowrap">
+                                                {dateStr}
+                                            </td>
+
+                                            {/* Time */}
+                                            <td className="px-6 py-5 text-xs font-medium text-stone-400 whitespace-nowrap font-mono">
+                                                {timeStr}
                                             </td>
 
                                             {/* Asset */}
@@ -262,17 +277,6 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                                                         {trade.confidence}%
                                                     </span>
                                                 </div>
-                                            </td>
-
-                                            {/* P&L */}
-                                            <td className="px-6 py-5 text-right">
-                                                <span className={twMerge(
-                                                    "text-sm font-mono font-bold tracking-tight",
-                                                    trade.pnl > 0 ? "text-emerald-600" : trade.pnl < 0 ? "text-red-500" : "text-stone-300"
-                                                )}>
-                                                    {trade.pnl > 0 ? '+' : ''}{trade.pnl}
-                                                    <span className="text-[10px] font-sans text-stone-300 ml-1 font-medium">USD</span>
-                                                </span>
                                             </td>
 
                                             {/* Actions */}

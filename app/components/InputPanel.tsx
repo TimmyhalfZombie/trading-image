@@ -115,7 +115,7 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
 
 export function InputPanel({ files, onFilesChange, onAnalyze, isLoading = false, hasAnalyzed = false }: InputPanelProps) {
     const isReady = files.htf && files.mid && files.ltf;
-    const canAnalyze = isReady && !isLoading && !hasAnalyzed;
+    const canAnalyze = isReady && !isLoading;
 
     const handleAnalyze = () => {
         if (canAnalyze) {

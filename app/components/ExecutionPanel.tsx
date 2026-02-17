@@ -62,7 +62,7 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
                 )}
             </div>
 
-            <div className="flex-1 p-6 relative">
+            <div className="flex-1 p-6 relative min-h-0">
                 {!isAnalyzed ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center opacity-30 select-none pointer-events-none p-12">
                         <div className="w-14 h-14 rounded-full bg-stone-50 flex items-center justify-center border border-stone-100 mb-4">
@@ -73,7 +73,7 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
                 ) : (
                     <div className="flex flex-col h-full gap-5 animate-in fade-in slide-in-from-right-4 duration-500">
                         {/* Signal Section */}
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-3 flex-shrink-0">
                             <div className="flex items-center justify-between">
                                 <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-[0.15em]">Signal</span>
                                 <div className={twMerge(
@@ -107,7 +107,7 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
                         </div>
 
                         {/* SL / TP Grid */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3 flex-shrink-0">
                             <button
                                 onClick={() => copyToClipboard(result.sl.toString(), 'Stop Loss')}
                                 className="bg-stone-50/60 rounded-xl p-4 border border-stone-100 group hover:border-red-300 hover:bg-red-50/20 transition-all text-left cursor-pointer active:scale-[0.98]"
@@ -130,7 +130,7 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
                         </div>
 
                         {/* Reasoning */}
-                        <div className="flex-1 bg-stone-50/60 rounded-xl p-5 border border-stone-100 overflow-y-auto min-h-[100px]">
+                        <div className="flex-1 bg-stone-50/60 rounded-xl p-5 border border-stone-100 overflow-y-auto min-h-0">
                             <h3 className="text-[10px] text-stone-400 uppercase tracking-[0.15em] font-semibold mb-3 flex items-center gap-1.5">
                                 <BadgeCheck className="w-3 h-3" />
                                 Reasoning
