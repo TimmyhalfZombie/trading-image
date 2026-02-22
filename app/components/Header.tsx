@@ -1,8 +1,9 @@
 "use client";
 
 import React from 'react';
-import { LayoutDashboard, History } from 'lucide-react';
+import { LayoutDashboard, History, Sun, Moon } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
+import { useTheme } from './ThemeProvider';
 
 interface HeaderProps {
     activeTab: 'analysis' | 'history';
@@ -10,8 +11,16 @@ interface HeaderProps {
 }
 
 export function Header({ activeTab, onTabChange }: HeaderProps) {
+    const { theme, toggleTheme } = useTheme();
+
     return (
-        <header className="flex items-center justify-between px-8 py-3.5 border-b border-stone-200/80 bg-white/80 backdrop-blur-md z-10 w-full">
+        <header
+            className="flex items-center justify-between px-8 py-3.5 z-10 w-full backdrop-blur-md transition-colors duration-300"
+            style={{
+                backgroundColor: theme === 'dark' ? 'rgba(12, 10, 9, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                borderBottom: `1px solid var(--border-light)`,
+            }}
+        >
             <div className="flex items-center gap-3 group cursor-default select-none">
                 <div className="relative w-9 h-9 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
                     <svg
@@ -37,41 +46,87 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                     </svg>
                 </div>
                 <div className="flex flex-col">
-                    <h1 className="text-xl font-black tracking-tight text-stone-800 leading-none group-hover:text-amber-600 transition-colors">
+                    <h1
+                        className="text-xl font-black tracking-tight leading-none group-hover:text-amber-500 transition-colors"
+                        style={{ color: 'var(--text-primary)' }}
+                    >
                         HIVE
                     </h1>
-                    <span className="text-[9px] font-semibold tracking-[0.2em] text-stone-400 uppercase">
+                    <span
+                        className="text-[9px] font-semibold tracking-[0.2em] uppercase"
+                        style={{ color: 'var(--text-tertiary)' }}
+                    >
                         Smart Trading
                     </span>
                 </div>
             </div>
 
-            <nav className="flex items-center bg-stone-100/60 rounded-full p-1 border border-stone-200/60">
-                <button
-                    onClick={() => onTabChange('analysis')}
-                    className={twMerge(
-                        "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide",
-                        activeTab === 'analysis'
-                            ? "bg-white text-stone-800 shadow-sm ring-1 ring-stone-200/50"
-                            : "text-stone-400 hover:text-stone-700"
-                    )}
+            <div className="flex items-center gap-3">
+                <nav
+                    className="flex items-center rounded-full p-1 transition-colors duration-300"
+                    style={{
+                        backgroundColor: 'var(--nav-bg)',
+                        border: '1px solid var(--border-light)',
+                    }}
                 >
-                    <LayoutDashboard className="w-3.5 h-3.5" />
-                    Analysis
-                </button>
+                    <button
+                        onClick={() => onTabChange('analysis')}
+                        className={twMerge(
+                            "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide",
+                            activeTab === 'analysis'
+                                ? "shadow-sm"
+                                : "hover:opacity-80"
+                        )}
+                        style={activeTab === 'analysis' ? {
+                            backgroundColor: 'var(--nav-active-bg)',
+                            color: 'var(--nav-active-text)',
+                            boxShadow: `0 0 0 1px var(--nav-active-ring)`,
+                        } : {
+                            color: 'var(--text-tertiary)',
+                        }}
+                    >
+                        <LayoutDashboard className="w-3.5 h-3.5" />
+                        Analysis
+                    </button>
+                    <button
+                        onClick={() => onTabChange('history')}
+                        className={twMerge(
+                            "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide",
+                            activeTab === 'history'
+                                ? "shadow-sm"
+                                : "hover:opacity-80"
+                        )}
+                        style={activeTab === 'history' ? {
+                            backgroundColor: 'var(--nav-active-bg)',
+                            color: 'var(--nav-active-text)',
+                            boxShadow: `0 0 0 1px var(--nav-active-ring)`,
+                        } : {
+                            color: 'var(--text-tertiary)',
+                        }}
+                    >
+                        <History className="w-3.5 h-3.5" />
+                        History
+                    </button>
+                </nav>
+
+                {/* Theme Toggle */}
                 <button
-                    onClick={() => onTabChange('history')}
-                    className={twMerge(
-                        "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide",
-                        activeTab === 'history'
-                            ? "bg-white text-stone-800 shadow-sm ring-1 ring-stone-200/50"
-                            : "text-stone-400 hover:text-stone-700"
-                    )}
+                    onClick={toggleTheme}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+                    style={{
+                        backgroundColor: 'var(--nav-bg)',
+                        border: '1px solid var(--border-light)',
+                        color: 'var(--text-secondary)',
+                    }}
+                    title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 >
-                    <History className="w-3.5 h-3.5" />
-                    History
+                    {theme === 'dark' ? (
+                        <Sun className="w-4 h-4" />
+                    ) : (
+                        <Moon className="w-4 h-4" />
+                    )}
                 </button>
-            </nav>
+            </div>
         </header>
     );
 }

@@ -1,19 +1,101 @@
 @import "tailwindcss";
 
+/* ═══════════════ LIGHT MODE (default) ═══════════════ */
 :root {
-  --background: #FAFAF8;
+  --bg: #FAFAF8;
+  --bg-secondary: #F5F5F4;
   --surface: #FFFFFF;
+  --surface-hover: #FAFAF9;
+  --surface-alt: rgba(250, 250, 249, 0.6);
+
   --accent: #F59E0B;
+  --accent-hover: #D97706;
   --accent-soft: #FEF3C7;
+  --accent-glow: rgba(245, 158, 11, 0.15);
+
   --text-primary: #1C1917;
   --text-secondary: #78716C;
-  --win: #16A34A;
-  --loss: #DC2626;
+  --text-tertiary: #A8A29E;
+  --text-inverse: #FFFFFF;
+
   --border: #E7E5E4;
+  --border-light: rgba(231, 229, 228, 0.6);
+  --border-active: #D6D3D1;
+
+  --win: #16A34A;
+  --win-bg: rgba(22, 163, 74, 0.06);
+  --win-border: rgba(22, 163, 74, 0.15);
+  --loss: #DC2626;
+  --loss-bg: rgba(220, 38, 38, 0.06);
+  --loss-border: rgba(220, 38, 38, 0.15);
+
+  --neutral-bg: #F5F5F4;
+  --neutral-border: #E7E5E4;
+
+  --nav-bg: rgba(245, 245, 244, 0.6);
+  --nav-active-bg: #FFFFFF;
+  --nav-active-text: #1C1917;
+  --nav-active-ring: rgba(231, 229, 228, 0.5);
+
+  --overlay: rgba(28, 25, 23, 0.2);
+  --modal-bg: #FFFFFF;
+
+  --scrollbar-thumb: #D6D3D1;
+  --scrollbar-thumb-hover: #A8A29E;
+
+  --blur-1: rgba(252, 211, 77, 0.15);
+  --blur-2: rgba(251, 146, 60, 0.1);
+}
+
+/* ═══════════════ DARK MODE ═══════════════ */
+[data-theme="dark"] {
+  --bg: #0C0A09;
+  --bg-secondary: #1C1917;
+  --surface: #1C1917;
+  --surface-hover: #292524;
+  --surface-alt: rgba(28, 25, 23, 0.6);
+
+  --accent: #F59E0B;
+  --accent-hover: #FBBF24;
+  --accent-soft: rgba(245, 158, 11, 0.12);
+  --accent-glow: rgba(245, 158, 11, 0.08);
+
+  --text-primary: #FAFAF9;
+  --text-secondary: #A8A29E;
+  --text-tertiary: #78716C;
+  --text-inverse: #0C0A09;
+
+  --border: #292524;
+  --border-light: rgba(41, 37, 36, 0.6);
+  --border-active: #44403C;
+
+  --win: #4ADE80;
+  --win-bg: rgba(74, 222, 128, 0.08);
+  --win-border: rgba(74, 222, 128, 0.2);
+  --loss: #F87171;
+  --loss-bg: rgba(248, 113, 113, 0.08);
+  --loss-border: rgba(248, 113, 113, 0.2);
+
+  --neutral-bg: #292524;
+  --neutral-border: #44403C;
+
+  --nav-bg: rgba(28, 25, 23, 0.6);
+  --nav-active-bg: #292524;
+  --nav-active-text: #FAFAF9;
+  --nav-active-ring: rgba(68, 64, 60, 0.5);
+
+  --overlay: rgba(0, 0, 0, 0.5);
+  --modal-bg: #1C1917;
+
+  --scrollbar-thumb: #44403C;
+  --scrollbar-thumb-hover: #57534E;
+
+  --blur-1: rgba(245, 158, 11, 0.06);
+  --blur-2: rgba(251, 146, 60, 0.04);
 }
 
 @theme inline {
-  --color-background: var(--background);
+  --color-background: var(--bg);
   --color-surface: var(--surface);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
@@ -26,11 +108,12 @@
 }
 
 body {
-  background: var(--background);
+  background: var(--bg);
   color: var(--text-primary);
   font-family: var(--font-inter), sans-serif;
   overflow: hidden;
   height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Smooth scrollbar */
@@ -43,10 +126,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D6D3D1;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #A8A29E;
+  background: var(--scrollbar-thumb-hover);
 }

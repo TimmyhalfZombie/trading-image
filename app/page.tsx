@@ -199,7 +199,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col h-screen bg-[#FAFAF8] font-sans selection:bg-amber-100 selection:text-amber-900">
+    <main className="flex flex-col h-screen font-sans selection:bg-amber-100 selection:text-amber-900 transition-colors duration-300" style={{ backgroundColor: 'var(--bg)' }}>
 
       {/* Header */}
       <Header activeTab={activeTab} onTabChange={setActiveTab} />
@@ -257,8 +257,8 @@ export default function Home() {
       </div>
 
       {/* Decorative Blur Elements */}
-      <div className="fixed -bottom-32 -left-32 w-96 h-96 bg-amber-200 rounded-full blur-[150px] opacity-15 pointer-events-none z-0 mix-blend-multiply"></div>
-      <div className="fixed -top-32 -right-32 w-96 h-96 bg-orange-200 rounded-full blur-[150px] opacity-10 pointer-events-none z-0 mix-blend-multiply"></div>
+      <div className="fixed -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0" style={{ backgroundColor: 'var(--blur-1)' }}></div>
+      <div className="fixed -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0" style={{ backgroundColor: 'var(--blur-2)' }}></div>
 
     </main>
   );

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, X, Loader2, Image as ImageIcon, CheckCircle2, Zap } from 'lucide-react';
+import { Upload, X, Loader2, Image as ImageIcon, Zap } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
 export interface InputPanelFiles {
@@ -58,7 +58,13 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
     return (
         <div className={twMerge("w-full relative transition-all", className)}>
             {file && preview ? (
-                <div className="relative w-full h-full bg-stone-900 rounded-xl border border-stone-700 overflow-hidden group">
+                <div
+                    className="relative w-full h-full rounded-xl overflow-hidden group"
+                    style={{
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border)',
+                    }}
+                >
                     <img
                         src={preview}
                         alt={label}
@@ -88,23 +94,32 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
                     {...getRootProps()}
                     className={twMerge(
                         "w-full h-full border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer flex flex-col items-center justify-center text-center p-4 relative group",
-                        isDragActive
-                            ? "border-amber-400 bg-amber-50/30"
-                            : "border-stone-200 hover:border-amber-300 hover:bg-stone-50/50",
                         disabled && "opacity-50 cursor-not-allowed pointer-events-none"
                     )}
+                    style={{
+                        borderColor: isDragActive ? 'var(--accent)' : 'var(--border)',
+                        backgroundColor: isDragActive ? 'var(--accent-glow)' : 'transparent',
+                    }}
                 >
                     <input {...getInputProps()} />
                     <div className="flex flex-col items-center gap-2">
-                        <div className={twMerge(
-                            "w-9 h-9 rounded-full bg-stone-50 flex items-center justify-center border border-stone-100 transition-all group-hover:scale-110 duration-300",
-                            isDragActive && "bg-amber-50 border-amber-200"
-                        )}>
-                            <Upload className={twMerge("w-4 h-4 text-stone-300", isDragActive && "text-amber-500")} />
+                        <div
+                            className={twMerge(
+                                "w-9 h-9 rounded-full flex items-center justify-center transition-all group-hover:scale-110 duration-300"
+                            )}
+                            style={{
+                                backgroundColor: isDragActive ? 'var(--accent-soft)' : 'var(--bg-secondary)',
+                                border: `1px solid ${isDragActive ? 'var(--accent)' : 'var(--border-light)'}`,
+                            }}
+                        >
+                            <Upload
+                                className="w-4 h-4"
+                                style={{ color: isDragActive ? 'var(--accent)' : 'var(--text-tertiary)' }}
+                            />
                         </div>
                         <div>
-                            <p className="text-sm font-semibold text-stone-600">{label}</p>
-                            <p className="text-[10px] text-stone-400 uppercase tracking-wide">{subLabel}</p>
+                            <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+                            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>{subLabel}</p>
                         </div>
                     </div>
                 </div>
@@ -128,13 +143,26 @@ export function InputPanel({ files, onFilesChange, onAnalyze, isLoading = false,
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-2xl border border-stone-200/80 shadow-sm overflow-hidden flex-shrink-0">
-            <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+        <div
+            className="flex flex-col h-full rounded-2xl shadow-sm overflow-hidden flex-shrink-0 transition-colors duration-300"
+            style={{
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border-light)',
+            }}
+        >
+            <div
+                className="px-6 py-4 flex items-center justify-between"
+                style={{ borderBottom: '1px solid var(--border-light)' }}
+            >
                 <div>
-                    <h2 className="text-sm font-bold text-stone-700 tracking-wide uppercase">Chart Input</h2>
-                    <p className="text-[11px] text-stone-400 mt-0.5">Upload multi-timeframe screenshots</p>
+                    <h2 className="text-sm font-bold tracking-wide uppercase" style={{ color: 'var(--text-primary)' }}>Chart Input</h2>
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Upload multi-timeframe screenshots</p>
                 </div>
-                {isLoading && <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Processing</span>}
+                {isLoading && (
+                    <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Processing
+                    </span>
+                )}
             </div>
 
             <div className="flex-1 p-5 flex flex-col gap-3 overflow-hidden">
@@ -176,9 +204,13 @@ export function InputPanel({ files, onFilesChange, onAnalyze, isLoading = false,
                     className={twMerge(
                         "w-full py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all duration-200 flex items-center justify-center gap-2",
                         canAnalyze
-                            ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-md shadow-amber-200/50 active:scale-[0.98]"
-                            : "bg-stone-100 text-stone-400 cursor-not-allowed"
+                            ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-md shadow-amber-500/20 active:scale-[0.98]"
+                            : "cursor-not-allowed"
                     )}
+                    style={!canAnalyze ? {
+                        backgroundColor: 'var(--bg-secondary)',
+                        color: 'var(--text-tertiary)',
+                    } : undefined}
                 >
                     {isLoading ? (
                         <>

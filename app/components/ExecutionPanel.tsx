@@ -49,14 +49,30 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-2xl border border-stone-200/80 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+        <div
+            className="flex flex-col h-full rounded-2xl shadow-sm overflow-hidden transition-colors duration-300"
+            style={{
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border-light)',
+            }}
+        >
+            <div
+                className="px-6 py-4 flex items-center justify-between"
+                style={{ borderBottom: '1px solid var(--border-light)' }}
+            >
                 <div>
-                    <h2 className="text-sm font-bold text-stone-700 tracking-wide uppercase">AI Output</h2>
-                    <p className="text-[11px] text-stone-400 mt-0.5">Signal, levels & reasoning</p>
+                    <h2 className="text-sm font-bold tracking-wide uppercase" style={{ color: 'var(--text-primary)' }}>AI Output</h2>
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Signal, levels & reasoning</p>
                 </div>
                 {result?.asset && (
-                    <span className="text-[11px] px-2.5 py-1 rounded-lg bg-stone-50 text-stone-500 font-mono border border-stone-200/80 font-semibold">
+                    <span
+                        className="text-[11px] px-2.5 py-1 rounded-lg font-mono font-semibold"
+                        style={{
+                            backgroundColor: 'var(--bg-secondary)',
+                            color: 'var(--text-secondary)',
+                            border: '1px solid var(--border-light)',
+                        }}
+                    >
                         {result.asset}
                     </span>
                 )}
@@ -65,42 +81,57 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
             <div className="flex-1 p-6 relative min-h-0">
                 {!isAnalyzed ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center opacity-30 select-none pointer-events-none p-12">
-                        <div className="w-14 h-14 rounded-full bg-stone-50 flex items-center justify-center border border-stone-100 mb-4">
-                            <Crosshair className="w-6 h-6 text-stone-300 stroke-1" />
+                        <div
+                            className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
+                            style={{
+                                backgroundColor: 'var(--bg-secondary)',
+                                border: '1px solid var(--border-light)',
+                            }}
+                        >
+                            <Crosshair className="w-6 h-6 stroke-1" style={{ color: 'var(--text-tertiary)' }} />
                         </div>
-                        <p className="text-xs font-medium text-stone-400">Upload charts to begin analysis</p>
+                        <p className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Upload charts to begin analysis</p>
                     </div>
                 ) : (
                     <div className="flex flex-col h-full gap-5 animate-in fade-in slide-in-from-right-4 duration-500">
                         {/* Signal Section */}
                         <div className="flex flex-col gap-3 flex-shrink-0">
                             <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-[0.15em]">Signal</span>
-                                <div className={twMerge(
-                                    "px-4 py-1.5 rounded-full text-sm font-bold border",
-                                    result.signal === 'BUY' ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-                                        result.signal === 'SELL' ? "bg-red-50 text-red-600 border-red-200" :
-                                            "bg-amber-50 text-amber-600 border-amber-200"
-                                )}>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.15em]" style={{ color: 'var(--text-tertiary)' }}>Signal</span>
+                                <div
+                                    className="px-4 py-1.5 rounded-full text-sm font-bold"
+                                    style={{
+                                        backgroundColor: result.signal === 'BUY' ? 'var(--win-bg)' :
+                                            result.signal === 'SELL' ? 'var(--loss-bg)' : 'var(--accent-soft)',
+                                        color: result.signal === 'BUY' ? 'var(--win)' :
+                                            result.signal === 'SELL' ? 'var(--loss)' : 'var(--accent)',
+                                        border: `1px solid ${result.signal === 'BUY' ? 'var(--win-border)' :
+                                            result.signal === 'SELL' ? 'var(--loss-border)' : 'var(--accent-glow)'}`,
+                                    }}
+                                >
                                     {result.confidence}% Confidence
                                 </div>
                             </div>
 
-                            <div className={twMerge(
-                                "flex items-center justify-center gap-3 py-7 rounded-xl border transition-all",
-                                result.signal === 'BUY' ? "bg-emerald-50/40 border-emerald-100" :
-                                    result.signal === 'SELL' ? "bg-red-50/40 border-red-100" :
-                                        "bg-stone-50 border-stone-100"
-                            )}>
-                                {result.signal === 'BUY' ? <TrendingUp className="w-7 h-7 text-emerald-500" /> :
-                                    result.signal === 'SELL' ? <TrendingDown className="w-7 h-7 text-red-500" /> :
-                                        <Minus className="w-7 h-7 text-stone-400" />}
-                                <h1 className={twMerge(
-                                    "text-4xl font-black tracking-tighter",
-                                    result.signal === 'BUY' ? "text-emerald-600" :
-                                        result.signal === 'SELL' ? "text-red-500" :
-                                            "text-stone-400"
-                                )}>
+                            <div
+                                className="flex items-center justify-center gap-3 py-7 rounded-xl transition-all"
+                                style={{
+                                    backgroundColor: result.signal === 'BUY' ? 'var(--win-bg)' :
+                                        result.signal === 'SELL' ? 'var(--loss-bg)' : 'var(--neutral-bg)',
+                                    border: `1px solid ${result.signal === 'BUY' ? 'var(--win-border)' :
+                                        result.signal === 'SELL' ? 'var(--loss-border)' : 'var(--neutral-border)'}`,
+                                }}
+                            >
+                                {result.signal === 'BUY' ? <TrendingUp className="w-7 h-7" style={{ color: 'var(--win)' }} /> :
+                                    result.signal === 'SELL' ? <TrendingDown className="w-7 h-7" style={{ color: 'var(--loss)' }} /> :
+                                        <Minus className="w-7 h-7" style={{ color: 'var(--text-tertiary)' }} />}
+                                <h1
+                                    className="text-4xl font-black tracking-tighter"
+                                    style={{
+                                        color: result.signal === 'BUY' ? 'var(--win)' :
+                                            result.signal === 'SELL' ? 'var(--loss)' : 'var(--text-tertiary)',
+                                    }}
+                                >
                                     {result.signal}
                                 </h1>
                             </div>
@@ -110,32 +141,46 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
                         <div className="grid grid-cols-2 gap-3 flex-shrink-0">
                             <button
                                 onClick={() => copyToClipboard(result.sl.toString(), 'Stop Loss')}
-                                className="bg-stone-50/60 rounded-xl p-4 border border-stone-100 group hover:border-red-300 hover:bg-red-50/20 transition-all text-left cursor-pointer active:scale-[0.98]"
+                                className="rounded-xl p-4 group transition-all text-left cursor-pointer active:scale-[0.98]"
+                                style={{
+                                    backgroundColor: 'var(--surface-alt)',
+                                    border: '1px solid var(--border-light)',
+                                }}
                             >
-                                <span className="text-[10px] text-stone-400 uppercase tracking-[0.15em] font-semibold group-hover:text-red-500 transition-colors block mb-1">Stop Loss</span>
-                                <p className="text-xl font-mono text-red-500 font-bold tracking-tight">
+                                <span className="text-[10px] uppercase tracking-[0.15em] font-semibold block mb-1" style={{ color: 'var(--text-tertiary)' }}>Stop Loss</span>
+                                <p className="text-xl font-mono font-bold tracking-tight" style={{ color: 'var(--loss)' }}>
                                     {result.sl === 0 ? '---' : result.sl}
                                 </p>
                             </button>
 
                             <button
                                 onClick={() => copyToClipboard(result.tp.toString(), 'Take Profit')}
-                                className="bg-stone-50/60 rounded-xl p-4 border border-stone-100 group hover:border-emerald-300 hover:bg-emerald-50/20 transition-all text-left cursor-pointer active:scale-[0.98]"
+                                className="rounded-xl p-4 group transition-all text-left cursor-pointer active:scale-[0.98]"
+                                style={{
+                                    backgroundColor: 'var(--surface-alt)',
+                                    border: '1px solid var(--border-light)',
+                                }}
                             >
-                                <span className="text-[10px] text-stone-400 uppercase tracking-[0.15em] font-semibold group-hover:text-emerald-500 transition-colors block mb-1">Take Profit</span>
-                                <p className="text-xl font-mono text-emerald-600 font-bold tracking-tight">
+                                <span className="text-[10px] uppercase tracking-[0.15em] font-semibold block mb-1" style={{ color: 'var(--text-tertiary)' }}>Take Profit</span>
+                                <p className="text-xl font-mono font-bold tracking-tight" style={{ color: 'var(--win)' }}>
                                     {result.tp === 0 ? '---' : result.tp}
                                 </p>
                             </button>
                         </div>
 
                         {/* Reasoning */}
-                        <div className="flex-1 bg-stone-50/60 rounded-xl p-5 border border-stone-100 overflow-y-auto min-h-0">
-                            <h3 className="text-[10px] text-stone-400 uppercase tracking-[0.15em] font-semibold mb-3 flex items-center gap-1.5">
+                        <div
+                            className="flex-1 rounded-xl p-5 overflow-y-auto min-h-0"
+                            style={{
+                                backgroundColor: 'var(--surface-alt)',
+                                border: '1px solid var(--border-light)',
+                            }}
+                        >
+                            <h3 className="text-[10px] uppercase tracking-[0.15em] font-semibold mb-3 flex items-center gap-1.5" style={{ color: 'var(--text-tertiary)' }}>
                                 <BadgeCheck className="w-3 h-3" />
                                 Reasoning
                             </h3>
-                            <p className="text-sm text-stone-600 leading-relaxed font-medium">
+                            <p className="text-sm leading-relaxed font-medium" style={{ color: 'var(--text-secondary)' }}>
                                 {result.reasoning}
                             </p>
                         </div>
