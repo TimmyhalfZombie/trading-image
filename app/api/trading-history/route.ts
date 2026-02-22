@@ -13,6 +13,7 @@ export async function GET() {
         const { data: records, error } = await supabase
             .from('trading_signals')
             .select('*')
+            .in('signal_type', ['BUY', 'SELL'])
             .order('created_at', { ascending: false })
             .limit(20);
 
