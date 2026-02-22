@@ -72,7 +72,7 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                     <button
                         onClick={() => onTabChange('analysis')}
                         className={twMerge(
-                            "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide",
+                            "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide cursor-pointer",
                             activeTab === 'analysis'
                                 ? "shadow-sm"
                                 : "hover:opacity-80"
@@ -91,7 +91,7 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                     <button
                         onClick={() => onTabChange('history')}
                         className={twMerge(
-                            "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide",
+                            "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide cursor-pointer",
                             activeTab === 'history'
                                 ? "shadow-sm"
                                 : "hover:opacity-80"
@@ -112,7 +112,7 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                 {/* Theme Toggle */}
                 <button
                     onClick={toggleTheme}
-                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
                     style={{
                         backgroundColor: 'var(--nav-bg)',
                         border: '1px solid var(--border-light)',

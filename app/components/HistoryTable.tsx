@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, Inbox, Loader2, RotateCcw, ArrowUpRight, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { toast } from 'sonner';
+import { DeleteModal } from './modals/DeleteModal';
 
 export interface Trade {
     id: string;
@@ -206,9 +207,14 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                     {trades.length > 0 && (
                         <button
                             onClick={handleDeleteAllClick}
-                            className="text-[11px] font-semibold transition-colors px-2 py-1 rounded-md"
-                            style={{ color: 'var(--text-tertiary)' }}
+                            className="text-[11px] font-bold transition-all px-3.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 hover:opacity-90 active:scale-[0.97]"
+                            style={{
+                                backgroundColor: 'var(--loss-bg)',
+                                color: 'var(--loss)',
+                                border: '1px solid var(--loss-border)',
+                            }}
                         >
+                            <Trash2 className="w-3 h-3" />
                             Clear All
                         </button>
                     )}
@@ -339,10 +345,10 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
 
                                             {/* Actions */}
                                             <td className="px-8 py-5 text-right">
-                                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-x-2 group-hover:translate-x-0">
+                                                <div className="flex items-center justify-end gap-1">
                                                     <button
                                                         onClick={() => onView && onView(trade)}
-                                                        className="p-2 rounded-lg transition-colors"
+                                                        className="p-2 rounded-lg transition-colors cursor-pointer"
                                                         style={{ color: 'var(--text-tertiary)' }}
                                                         title="View Analysis"
                                                     >
@@ -351,7 +357,7 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                                                     <button
                                                         onClick={(e) => handleDeleteClick(trade.id, e)}
                                                         disabled={deletingId === trade.id}
-                                                        className="p-2 rounded-lg transition-colors disabled:opacity-50"
+                                                        className="p-2 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                                                         style={{ color: 'var(--text-tertiary)' }}
                                                         title="Delete Record"
                                                     >
@@ -372,57 +378,12 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                 </div>
             </div>
 
-            {/* Delete Confirmation Modal */}
-            {deleteModal.isOpen && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-                    style={{ backgroundColor: 'var(--overlay)' }}
-                >
-                    <div
-                        className="rounded-3xl shadow-xl p-6 max-w-[320px] w-full animate-in zoom-in-95 duration-200"
-                        style={{
-                            backgroundColor: 'var(--modal-bg)',
-                            border: '1px solid var(--border-light)',
-                        }}
-                    >
-                        <div className="flex flex-col items-center text-center">
-                            <div
-                                className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-                                style={{ backgroundColor: 'var(--loss-bg)', border: '1px solid var(--loss-border)' }}
-                            >
-                                <Trash2 className="w-6 h-6 stroke-[1.5]" style={{ color: 'var(--loss)' }} />
-                            </div>
-                            <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                                {deleteModal.type === 'all' ? 'Clear All History' : 'Delete Record'}
-                            </h3>
-                            <p className="text-xs mb-6 leading-relaxed px-2" style={{ color: 'var(--text-secondary)' }}>
-                                {deleteModal.type === 'all'
-                                    ? "This will permanently remove all signal records. This cannot be undone."
-                                    : "This record will be permanently deleted."}
-                            </p>
-                            <div className="flex gap-3 w-full">
-                                <button
-                                    onClick={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
-                                    className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors"
-                                    style={{
-                                        backgroundColor: 'var(--surface)',
-                                        color: 'var(--text-secondary)',
-                                        border: '1px solid var(--border)',
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={confirmDelete}
-                                    className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 shadow-sm shadow-red-500/20 transition-colors"
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <DeleteModal
+                isOpen={deleteModal.isOpen}
+                type={deleteModal.type}
+                onCancel={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmDelete}
+            />
         </>
     );
 }
