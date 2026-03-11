@@ -76,7 +76,7 @@ export default function LoginPage() {
     };
 
     return (
-        <main className="flex min-h-screen flex-col items-center justify-center p-6 transition-colors duration-300" style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
+        <main className={`flex min-h-screen flex-col items-center justify-start ${isLogin ? 'pt-24' : 'pt-2'} sm:justify-center sm:pt-6 px-6 pb-6 transition-all duration-300`} style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
             <Toaster position="top-right" richColors />
 
             <MotionConfig transition={{ duration: 0.4, ease: "easeInOut" }}>
