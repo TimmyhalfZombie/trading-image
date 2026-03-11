@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
     console.log("Analyze API hit");
@@ -107,13 +107,18 @@ export async function POST(request: Request) {
             // Normalize the data (handle array or single object)
             const result = Array.isArray(data) ? data[0] : data;
 
+            // Check user
+            const supabase = await createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+
             // Only attempt to save if we have a valid signal and supabase client
-            if (supabase && result && (result.signal || result.signal_type)) {
+            if (supabase && user && result && (result.signal || result.signal_type)) {
                 try {
                     const { error: dbError } = await supabase
                         .from('trading_signals')
                         .insert([
                             {
+                                user_id: user.id,
                                 asset_name: result.asset_name || result.asset || 'Unknown',
                                 signal_type: result.signal_type || result.signal || 'NEUTRAL',
                                 outcome: 'PENDING',

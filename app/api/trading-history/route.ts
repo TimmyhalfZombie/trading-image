@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
     console.log("Trading History API Route invoked");
+    const supabase = await createClient();
 
     if (!supabase) {
         console.warn("Supabase client not initialized. Check your environment variables.");
@@ -54,6 +55,7 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
     console.log("Trading History DELETE API invoked");
+    const supabase = await createClient();
 
     if (!supabase) {
         return NextResponse.json({ error: "Supabase client initialization failed" }, { status: 500 });

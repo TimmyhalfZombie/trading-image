@@ -1,9 +1,11 @@
 "use client";
 
 import React from 'react';
-import { LayoutDashboard, History, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, History, Sun, Moon, LogOut } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { useTheme } from './ThemeProvider';
+import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 
 interface HeaderProps {
     activeTab: 'analysis' | 'history';
@@ -12,6 +14,13 @@ interface HeaderProps {
 
 export function Header({ activeTab, onTabChange }: HeaderProps) {
     const { theme, toggleTheme } = useTheme();
+    const router = useRouter();
+    const supabase = createClient();
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push('/login');
+    };
 
     return (
         <header
@@ -125,6 +134,20 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                     ) : (
                         <Moon className="w-4 h-4" />
                     )}
+                </button>
+
+                {/* Logout Button */}
+                <button
+                    onClick={handleLogout}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer hover:bg-red-500/10 hover:text-red-500"
+                    style={{
+                        backgroundColor: 'var(--nav-bg)',
+                        border: '1px solid var(--border-light)',
+                        color: 'var(--text-secondary)',
+                    }}
+                    title="Sign Out"
+                >
+                    <LogOut className="w-4 h-4" />
                 </button>
             </div>
         </header>
