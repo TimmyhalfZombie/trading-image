@@ -20,6 +20,7 @@ interface AnalysisResult {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'analysis' | 'history'>('analysis');
+  const executionPanelRef = React.useRef<HTMLDivElement>(null);
 
   // State for file upload / processing
   const [isProcessing, setIsProcessing] = useState(false);
@@ -130,6 +131,15 @@ export default function Home() {
     return () => clearTimeout(timeoutId);
   }, [files]);
 
+  // Auto scroll to execution panel on mobile when processing starts/finishes
+  React.useEffect(() => {
+    if (status !== 'awaiting' && window.innerWidth < 1024) {
+      setTimeout(() => {
+        executionPanelRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [status]);
+
   const handleAnalysis = async (files: { htf: File, mid: File, ltf: File }) => {
     setIsProcessing(true);
     setStatus('analyzing');
@@ -234,7 +244,7 @@ export default function Home() {
             </div>
 
             {/* Right Panel: AI Execution Engine */}
-            <div className="flex-1 h-[600px] lg:h-full">
+            <div ref={executionPanelRef} className={`flex-1 h-[600px] lg:h-full ${status === 'awaiting' ? 'hidden lg:block' : 'block'}`}>
               <ExecutionPanel status={status} result={analysisResult} />
             </div>
           </div>
