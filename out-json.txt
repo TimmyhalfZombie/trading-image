@@ -1,0 +1,6 @@
+{
+  "email": "test_obj_1773246114846@example.com",
+  "signUpError": "email rate limit exceeded",
+  "sessionExists": false,
+  "isConfirmed": false
+}

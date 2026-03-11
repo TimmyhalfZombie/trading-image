@@ -192,7 +192,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                 </div>
             </div>
 
-            <div className="flex-1 p-4 md:p-5 flex flex-col md:flex-row lg:flex-col gap-3 overflow-y-auto lg:overflow-hidden">
+            <div className="flex-1 p-3 md:p-5 flex flex-col md:flex-row lg:flex-col gap-2 md:gap-3 overflow-y-auto lg:overflow-hidden">
                 <SingleDropzone
                     label="Higher Timeframe"
                     subLabel="4H Chart"
@@ -200,7 +200,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                     onDrop={(f) => onFilesChange({ ...files, htf: f })}
                     onRemove={() => onFilesChange({ ...files, htf: null })}
                     disabled={isLoading}
-                    className="flex-1 min-h-[140px] md:min-h-0"
+                    className="flex-1 min-h-[110px] md:min-h-0"
                 />
 
                 <SingleDropzone
@@ -210,7 +210,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                     onDrop={(f) => onFilesChange({ ...files, mid: f })}
                     onRemove={() => onFilesChange({ ...files, mid: null })}
                     disabled={isLoading}
-                    className="flex-1 min-h-[140px] md:min-h-0"
+                    className="flex-1 min-h-[110px] md:min-h-0"
                 />
 
                 <SingleDropzone
@@ -220,7 +220,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                     onDrop={(f) => onFilesChange({ ...files, ltf: f })}
                     onRemove={() => onFilesChange({ ...files, ltf: null })}
                     disabled={isLoading}
-                    className="flex-1 min-h-[140px] md:min-h-0"
+                    className="flex-1 min-h-[110px] md:min-h-0"
                 />
             </div>
 

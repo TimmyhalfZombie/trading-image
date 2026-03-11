@@ -37,7 +37,7 @@ export default function LoginPage() {
                     setIsLoading(false);
                     return;
                 }
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
@@ -48,8 +48,15 @@ export default function LoginPage() {
                     },
                 });
                 if (error) throw error;
-                toast.success("Success! Check your email to confirm your account.");
-                setIsLogin(true); // Switch back to login view
+
+                if (data.session) {
+                    toast.success("Successfully signed up!");
+                    router.push('/');
+                    router.refresh();
+                } else {
+                    toast.success("Success! Check your email to confirm your account.");
+                    setIsLogin(true); // Switch back to login view
+                }
             }
         } catch (error: any) {
             toast.error(isLogin ? "Failed to login" : "Failed to sign up", { description: error.message });
@@ -265,8 +272,8 @@ export default function LoginPage() {
             </MotionConfig>
 
             {/* Decorative Blur Elements */}
-            <div className="fixed -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0" style={{ backgroundColor: 'var(--blur-1)' }}></div>
-            <div className="fixed -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0" style={{ backgroundColor: 'var(--blur-2)' }}></div>
+            <div className="fixed -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-1)' }}></div>
+            <div className="fixed -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-2)' }}></div>
         </main>
     );
 }

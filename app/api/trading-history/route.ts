@@ -11,9 +11,15 @@ export async function GET() {
     }
 
     try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const { data: records, error } = await supabase
             .from('trading_signals')
             .select('*')
+            .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(20);
 
@@ -62,26 +68,31 @@ export async function DELETE(request: Request) {
     }
 
     try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
         const deleteAll = searchParams.get('all') === 'true';
 
-
-
         let error;
 
         if (deleteAll) {
-            // Delete all records where ID is not the zero UUID (effectively all valid UUIDs)
+            // Delete all records belonging to the current user
             const result = await supabase
                 .from('trading_signals')
                 .delete()
-                .neq('id', '00000000-0000-0000-0000-000000000000');
+                .eq('user_id', user.id);
             error = result.error;
         } else if (id) {
+            // Delete a specific record, ensuring it belongs to the current user
             const result = await supabase
                 .from('trading_signals')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('user_id', user.id);
             error = result.error;
         } else {
             return NextResponse.json({ error: "Missing 'id' parameter or 'all=true'" }, { status: 400 });
