@@ -209,7 +209,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col h-screen font-sans selection:bg-amber-100 selection:text-amber-900 transition-colors duration-300" style={{ backgroundColor: 'var(--bg)' }}>
+    <main className="flex flex-col h-[100dvh] w-full overflow-hidden font-sans selection:bg-amber-100 selection:text-amber-900 transition-colors duration-300 relative" style={{ backgroundColor: 'var(--bg)' }}>
 
       {/* Header */}
       <Header activeTab={activeTab} onTabChange={setActiveTab} />

@@ -111,8 +111,7 @@ body {
   background: var(--bg);
   color: var(--text-primary);
   font-family: var(--font-inter), sans-serif;
-  overflow: hidden;
-  height: 100vh;
+  min-height: 100dvh;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 

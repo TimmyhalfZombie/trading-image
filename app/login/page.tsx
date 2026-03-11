@@ -83,16 +83,21 @@ export default function LoginPage() {
     };
 
     return (
-        <main className={`flex min-h-screen flex-col items-center justify-start ${isLogin ? 'pt-24' : 'pt-2'} sm:justify-center sm:pt-6 px-6 pb-6 transition-all duration-300`} style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
-            <Toaster position="top-right" richColors />
+        <main className="fixed inset-0 overflow-y-auto overflow-x-hidden" style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
+            {/* Decorative Blur Elements - Pinned beneath scrolling content */}
+            <div className="fixed -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-1)' }}></div>
+            <div className="fixed -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-2)' }}></div>
 
-            <MotionConfig transition={{ duration: 0.4, ease: "easeInOut" }}>
-                <motion.div
-                    layout
-                    transition={{ duration: 0.4, ease: "easeInOut" }}
-                    className="w-full max-w-sm p-5 sm:p-7 rounded-3xl backdrop-blur-md shadow-2xl flex flex-col items-center border transition-colors duration-300 overflow-hidden"
-                    style={{ backgroundColor: 'var(--surface-alt)', border: '1px solid var(--border)' }}
-                >
+            <div className="min-h-full flex flex-col items-center justify-center p-4 sm:p-6 py-8 relative w-full z-10">
+                <Toaster position="top-right" richColors />
+
+                <MotionConfig transition={{ duration: 0.4, ease: "easeInOut" }}>
+                    <motion.div
+                        layout
+                        transition={{ duration: 0.4, ease: "easeInOut" }}
+                        className="w-full max-w-sm p-5 sm:p-7 rounded-3xl backdrop-blur-md shadow-2xl flex flex-col items-center border transition-colors duration-300 overflow-hidden"
+                        style={{ backgroundColor: 'var(--surface-alt)', border: '1px solid var(--border)' }}
+                    >
                     <div className="relative w-10 h-10 flex items-center justify-center mb-3">
                         <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M13.5 6.5L19.5 10V17L13.5 20.5L7.5 17V10L13.5 6.5Z" className="fill-amber-400" />
@@ -270,10 +275,7 @@ export default function LoginPage() {
                     </motion.p>
                 </motion.div>
             </MotionConfig>
-
-            {/* Decorative Blur Elements */}
-            <div className="fixed -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-1)' }}></div>
-            <div className="fixed -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-2)' }}></div>
+            </div>
         </main>
     );
 }
