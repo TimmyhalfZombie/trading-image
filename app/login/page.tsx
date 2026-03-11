@@ -83,12 +83,12 @@ export default function LoginPage() {
     };
 
     return (
-        <main className="fixed inset-0 overflow-y-auto overflow-x-hidden" style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
+        <main className="min-h-screen grid items-center justify-items-center p-4 sm:p-6 overflow-hidden relative" style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
             {/* Decorative Blur Elements - Pinned beneath scrolling content */}
-            <div className="fixed -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-1)' }}></div>
-            <div className="fixed -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-2)' }}></div>
+            <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-1)' }}></div>
+            <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-2)' }}></div>
 
-            <div className="min-h-full flex flex-col items-center justify-center p-4 sm:p-6 py-8 relative w-full z-10">
+            <div className="w-full max-w-sm relative z-10 py-10 my-auto">
                 <Toaster position="top-right" richColors />
 
                 <MotionConfig transition={{ duration: 0.4, ease: "easeInOut" }}>
