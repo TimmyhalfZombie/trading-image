@@ -15,7 +15,7 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
 
     return (
         <header
-            className="flex items-center justify-between px-8 py-3.5 z-10 w-full backdrop-blur-md transition-colors duration-300"
+            className="flex items-center justify-between px-4 md:px-8 py-3 py-md-3.5 z-10 w-full backdrop-blur-md transition-colors duration-300"
             style={{
                 backgroundColor: theme === 'dark' ? 'rgba(12, 10, 9, 0.8)' : 'rgba(255, 255, 255, 0.8)',
                 borderBottom: `1px solid var(--border-light)`,
@@ -47,13 +47,13 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                 </div>
                 <div className="flex flex-col">
                     <h1
-                        className="text-xl font-black tracking-tight leading-none group-hover:text-amber-500 transition-colors"
+                        className="text-lg md:text-xl font-black tracking-tight leading-none group-hover:text-amber-500 transition-colors"
                         style={{ color: 'var(--text-primary)' }}
                     >
                         HIVE
                     </h1>
                     <span
-                        className="text-[9px] font-semibold tracking-[0.2em] uppercase"
+                        className="text-[8px] md:text-[9px] font-semibold tracking-[0.2em] uppercase hidden sm:block"
                         style={{ color: 'var(--text-tertiary)' }}
                     >
                         Smart Trading
@@ -72,7 +72,7 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                     <button
                         onClick={() => onTabChange('analysis')}
                         className={twMerge(
-                            "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide cursor-pointer",
+                            "px-3 md:px-5 py-2 rounded-full text-[10px] md:text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 md:gap-2 tracking-wide cursor-pointer",
                             activeTab === 'analysis'
                                 ? "shadow-sm"
                                 : "hover:opacity-80"
@@ -85,13 +85,13 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                             color: 'var(--text-tertiary)',
                         }}
                     >
-                        <LayoutDashboard className="w-3.5 h-3.5" />
+                        <LayoutDashboard className="w-3.5 h-3.5 hidden sm:block" />
                         Analysis
                     </button>
                     <button
                         onClick={() => onTabChange('history')}
                         className={twMerge(
-                            "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide cursor-pointer",
+                            "px-3 md:px-5 py-2 rounded-full text-[10px] md:text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 md:gap-2 tracking-wide cursor-pointer",
                             activeTab === 'history'
                                 ? "shadow-sm"
                                 : "hover:opacity-80"
@@ -104,7 +104,7 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                             color: 'var(--text-tertiary)',
                         }}
                     >
-                        <History className="w-3.5 h-3.5" />
+                        <History className="w-3.5 h-3.5 hidden sm:block" />
                         History
                     </button>
                 </nav>

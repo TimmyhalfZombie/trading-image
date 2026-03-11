@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 interface ExecutionPanelProps {
     status?: 'awaiting' | 'analyzing' | 'completed';
     result?: {
-        signal: 'BUY' | 'SELL' | 'NEUTRAL';
+        signal: 'BUY' | 'SELL' | 'WAIT' | 'NEUTRAL';
         sl: number;
         tp: number;
         reasoning: string;

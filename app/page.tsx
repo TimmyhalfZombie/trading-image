@@ -10,7 +10,7 @@ import { toast, Toaster } from 'sonner';
 
 // Mock outcome type for demonstration
 interface AnalysisResult {
-  signal: 'BUY' | 'SELL' | 'NEUTRAL';
+  signal: 'BUY' | 'SELL' | 'WAIT' | 'NEUTRAL';
   sl: number;
   tp: number;
   reasoning: string;
@@ -208,17 +208,23 @@ export default function Home() {
       <Toaster position="top-right" richColors />
 
       {/* Main Content Area */}
-      <div className="flex-1 p-6 overflow-hidden">
+      <div className="flex-1 p-4 md:p-6 overflow-y-auto lg:overflow-hidden">
 
         {activeTab === 'analysis' ? (
-          <div className="flex flex-row gap-6 h-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
+          <div className="flex flex-col lg:flex-row gap-6 lg:h-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
             {/* Left Panel: Input Source */}
-            <div className="w-[400px] flex-shrink-0 h-full">
+            <div className="w-full lg:w-[400px] flex-shrink-0 lg:h-full h-[550px] lg:h-auto">
               {/* @ts-ignore - Temporary until InputPanel types are reloaded */}
               <InputPanel
                 files={files}
                 onFilesChange={(newFiles) => {
                   setFiles(newFiles);
+                  setHasAnalyzed(false);
+                }}
+                onClearAll={() => {
+                  setAnalysisResult(undefined);
+                  setStatus('awaiting');
+                  localStorage.removeItem('hive_analysis_result');
                   setHasAnalyzed(false);
                 }}
                 onAnalyze={handleAnalysis}
@@ -228,12 +234,12 @@ export default function Home() {
             </div>
 
             {/* Right Panel: AI Execution Engine */}
-            <div className="flex-1 h-full">
+            <div className="flex-1 h-[600px] lg:h-full">
               <ExecutionPanel status={status} result={analysisResult} />
             </div>
           </div>
         ) : (
-          <div className="h-full max-w-[1200px] mx-auto w-full animate-in fade-in duration-500">
+          <div className="lg:h-full min-h-[600px] max-w-[1200px] mx-auto w-full animate-in fade-in duration-500">
             <HistoryTable
               onView={(trade) => {
                 setAnalysisResult({

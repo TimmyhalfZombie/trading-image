@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, X, Loader2, Image as ImageIcon, Zap } from 'lucide-react';
+import { Upload, X, Loader2, Image as ImageIcon, Zap, Trash2 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
 export interface InputPanelFiles {
@@ -15,6 +15,7 @@ interface InputPanelProps {
     files: InputPanelFiles;
     onFilesChange: (files: InputPanelFiles) => void;
     onAnalyze: (files: { htf: File, mid: File, ltf: File }) => void;
+    onClearAll?: () => void;
     isLoading?: boolean;
     hasAnalyzed?: boolean;
 }
@@ -128,8 +129,9 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
     );
 }
 
-export function InputPanel({ files, onFilesChange, onAnalyze, isLoading = false, hasAnalyzed = false }: InputPanelProps) {
+export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoading = false, hasAnalyzed = false }: InputPanelProps) {
     const isReady = files.htf && files.mid && files.ltf;
+    const hasAnyFile = files.htf || files.mid || files.ltf;
     const canAnalyze = isReady && !isLoading;
 
     const handleAnalyze = () => {
@@ -158,14 +160,39 @@ export function InputPanel({ files, onFilesChange, onAnalyze, isLoading = false,
                     <h2 className="text-sm font-bold tracking-wide uppercase" style={{ color: 'var(--text-primary)' }}>Chart Input</h2>
                     <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Upload multi-timeframe screenshots</p>
                 </div>
-                {isLoading && (
-                    <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Processing
-                    </span>
-                )}
+                <div className="flex items-center gap-2">
+                    {isLoading && (
+                        <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Processing
+                        </span>
+                    )}
+                    {hasAnyFile && !isLoading && (
+                        <button
+                            onClick={() => {
+                                onFilesChange({ htf: null, mid: null, ltf: null });
+                                if (onClearAll) onClearAll();
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 hover:scale-105 active:scale-95"
+                            style={{
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                color: '#ef4444',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                            }}
+                        >
+                            <Trash2 className="w-3 h-3" />
+                            Remove All
+                        </button>
+                    )}
+                </div>
             </div>
 
-            <div className="flex-1 p-5 flex flex-col gap-3 overflow-hidden">
+            <div className="flex-1 p-4 md:p-5 flex flex-col md:flex-row lg:flex-col gap-3 overflow-y-auto lg:overflow-hidden">
                 <SingleDropzone
                     label="Higher Timeframe"
                     subLabel="4H Chart"
@@ -173,7 +200,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, isLoading = false,
                     onDrop={(f) => onFilesChange({ ...files, htf: f })}
                     onRemove={() => onFilesChange({ ...files, htf: null })}
                     disabled={isLoading}
-                    className="flex-1 min-h-0"
+                    className="flex-1 min-h-[140px] md:min-h-0"
                 />
 
                 <SingleDropzone
@@ -183,7 +210,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, isLoading = false,
                     onDrop={(f) => onFilesChange({ ...files, mid: f })}
                     onRemove={() => onFilesChange({ ...files, mid: null })}
                     disabled={isLoading}
-                    className="flex-1 min-h-0"
+                    className="flex-1 min-h-[140px] md:min-h-0"
                 />
 
                 <SingleDropzone
@@ -193,11 +220,11 @@ export function InputPanel({ files, onFilesChange, onAnalyze, isLoading = false,
                     onDrop={(f) => onFilesChange({ ...files, ltf: f })}
                     onRemove={() => onFilesChange({ ...files, ltf: null })}
                     disabled={isLoading}
-                    className="flex-1 min-h-0"
+                    className="flex-1 min-h-[140px] md:min-h-0"
                 />
             </div>
 
-            <div className="p-5 pt-0 mt-auto">
+            <div className="p-4 md:p-5 pt-0 mt-auto flex-shrink-0">
                 <button
                     onClick={handleAnalyze}
                     disabled={!canAnalyze}

@@ -1,16 +1,88 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { AlertCircle, Inbox, Loader2, RotateCcw, ArrowUpRight, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { AlertCircle, Inbox, Loader2, RotateCcw, ArrowUpRight, Trash2, TrendingUp, TrendingDown, Minus, ChevronDown, X, Check } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { toast } from 'sonner';
 import { DeleteModal } from './modals/DeleteModal';
+
+interface SelectOption {
+    label: string;
+    value: string;
+}
+
+interface CustomSelectProps {
+    value: string;
+    onChange: (val: string) => void;
+    options: SelectOption[];
+    style?: React.CSSProperties;
+}
+
+function CustomSelect({ value, onChange, options, style }: CustomSelectProps) {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedOption = options.find(o => o.value === value) || options[0];
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-2 text-[11px] font-semibold pl-3 pr-2.5 py-1.5 rounded-lg cursor-pointer transition-all active:scale-[0.98] outline-none"
+                style={style}
+            >
+                <span>{selectedOption.label}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} style={{ color: 'inherit', opacity: 0.7 }} />
+            </button>
+
+            {isOpen && (
+                <div
+                    className="absolute z-50 mt-1.5 w-max min-w-[130px] rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                    style={{
+                        backgroundColor: 'var(--surface)',
+                        border: '1px solid var(--border-light)',
+                    }}
+                >
+                    <div className="py-1 max-h-[250px] overflow-y-auto no-scrollbar">
+                        {options.map((option) => (
+                            <button
+                                key={option.value}
+                                onClick={() => {
+                                    onChange(option.value);
+                                    setIsOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2.5 text-[11px] font-semibold transition-colors flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5"
+                                style={{
+                                    color: value === option.value ? 'var(--accent)' : 'var(--text-secondary)',
+                                }}
+                            >
+                                <span>{option.label}</span>
+                                {value === option.value && <Check className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 
 export interface Trade {
     id: string;
     created_at: string;
     asset: string;
-    signal: 'BUY' | 'SELL' | 'NEUTRAL';
+    signal: 'BUY' | 'SELL' | 'WAIT' | 'NEUTRAL';
     outcome: 'WIN' | 'LOSS' | 'PENDING';
     confidence: number;
     pnl: number;
@@ -30,10 +102,52 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
     const [error, setError] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
+    // Filter state
+    const [filterDate, setFilterDate] = useState<string>('all');
+    const [filterAsset, setFilterAsset] = useState<string>('all');
+    const [filterSignal, setFilterSignal] = useState<string>('all');
+
     const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; type: 'single' | 'all'; id?: string }>({
         isOpen: false,
         type: 'single'
     });
+
+    // Compute unique filter options from trades data
+    const dateOptions = useMemo(() => {
+        const dates = new Set<string>();
+        trades.forEach(t => {
+            const d = new Date(t.created_at);
+            dates.add(d.toLocaleDateString(undefined, { month: 'short', day: '2-digit' }));
+        });
+        return Array.from(dates);
+    }, [trades]);
+
+    const assetOptions = useMemo(() => {
+        return Array.from(new Set(trades.map(t => t.asset)));
+    }, [trades]);
+
+    const signalOptions = ['BUY', 'SELL', 'WAIT'];
+
+    const hasActiveFilter = filterDate !== 'all' || filterAsset !== 'all' || filterSignal !== 'all';
+
+    const filteredTrades = useMemo(() => {
+        return trades.filter(t => {
+            if (filterDate !== 'all') {
+                const d = new Date(t.created_at);
+                const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: '2-digit' });
+                if (dateStr !== filterDate) return false;
+            }
+            if (filterAsset !== 'all' && t.asset !== filterAsset) return false;
+            if (filterSignal !== 'all' && t.signal !== filterSignal) return false;
+            return true;
+        });
+    }, [trades, filterDate, filterAsset, filterSignal]);
+
+    const clearFilters = () => {
+        setFilterDate('all');
+        setFilterAsset('all');
+        setFilterSignal('all');
+    };
 
     const fetchTrades = async () => {
         setIsLoading(true);
@@ -185,7 +299,7 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
             >
                 {/* Header */}
                 <div
-                    className="px-8 py-5 flex items-center justify-between sticky top-0 z-20"
+                    className="px-4 md:px-8 py-5 flex items-center justify-between sticky top-0 z-20"
                     style={{
                         backgroundColor: 'var(--surface)',
                         borderBottom: '1px solid var(--border-light)',
@@ -201,7 +315,7 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                                 border: '1px solid var(--border-light)',
                             }}
                         >
-                            {trades.length}
+                            {hasActiveFilter ? `${filteredTrades.length}/${trades.length}` : trades.length}
                         </span>
                     </div>
                     {trades.length > 0 && (
@@ -220,9 +334,93 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                     )}
                 </div>
 
+                {/* Filter Bar */}
+                {trades.length > 0 && (
+                    <div
+                        className="px-4 md:px-8 py-3 flex items-center gap-3 flex-wrap"
+                        style={{
+                            backgroundColor: 'var(--surface-alt)',
+                            borderBottom: '1px solid var(--border-light)',
+                        }}
+                    >
+                        {/* Date Filter */}
+                        <CustomSelect
+                            value={filterDate}
+                            onChange={setFilterDate}
+                            options={[
+                                { label: 'All Dates', value: 'all' },
+                                ...dateOptions.map(d => ({ label: d, value: d }))
+                            ]}
+                            style={{
+                                backgroundColor: filterDate !== 'all' ? 'var(--accent-soft)' : 'var(--bg-secondary)',
+                                color: filterDate !== 'all' ? 'var(--accent)' : 'var(--text-secondary)',
+                                border: `1px solid ${filterDate !== 'all' ? 'var(--accent-glow)' : 'var(--border-light)'}`,
+                            }}
+                        />
+
+                        {/* Asset Filter */}
+                        <CustomSelect
+                            value={filterAsset}
+                            onChange={setFilterAsset}
+                            options={[
+                                { label: 'All Assets', value: 'all' },
+                                ...assetOptions.map(a => ({ label: a, value: a }))
+                            ]}
+                            style={{
+                                backgroundColor: filterAsset !== 'all' ? 'var(--accent-soft)' : 'var(--bg-secondary)',
+                                color: filterAsset !== 'all' ? 'var(--accent)' : 'var(--text-secondary)',
+                                border: `1px solid ${filterAsset !== 'all' ? 'var(--accent-glow)' : 'var(--border-light)'}`,
+                            }}
+                        />
+
+                        {/* Signal Filter */}
+                        <CustomSelect
+                            value={filterSignal}
+                            onChange={setFilterSignal}
+                            options={[
+                                { label: 'All Signals', value: 'all' },
+                                ...signalOptions.map(s => ({ label: s, value: s }))
+                            ]}
+                            style={{
+                                backgroundColor: filterSignal !== 'all'
+                                    ? filterSignal === 'BUY' ? 'var(--win-bg)'
+                                        : filterSignal === 'SELL' ? 'var(--loss-bg)'
+                                            : 'var(--neutral-bg)'
+                                    : 'var(--bg-secondary)',
+                                color: filterSignal !== 'all'
+                                    ? filterSignal === 'BUY' ? 'var(--win)'
+                                        : filterSignal === 'SELL' ? 'var(--loss)'
+                                            : 'var(--text-secondary)'
+                                    : 'var(--text-secondary)',
+                                border: `1px solid ${filterSignal !== 'all'
+                                    ? filterSignal === 'BUY' ? 'var(--win-border)'
+                                        : filterSignal === 'SELL' ? 'var(--loss-border)'
+                                            : 'var(--neutral-border)'
+                                    : 'var(--border-light)'}`,
+                            }}
+                        />
+
+                        {/* Clear Filters */}
+                        {hasActiveFilter && (
+                            <button
+                                onClick={clearFilters}
+                                className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1 transition-colors hover:opacity-80 active:scale-[0.97]"
+                                style={{
+                                    backgroundColor: 'var(--bg-secondary)',
+                                    color: 'var(--text-tertiary)',
+                                    border: '1px solid var(--border-light)',
+                                }}
+                            >
+                                <X className="w-3 h-3" />
+                                Clear
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* Table Content */}
                 <div className="overflow-auto flex-1">
-                    {trades.length === 0 ? (
+                    {filteredTrades.length === 0 ? (
                         /* Empty State */
                         <div className="flex flex-col items-center justify-center h-full text-center py-20 opacity-80">
                             <div
@@ -258,7 +456,7 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {trades.map((trade) => {
+                                {filteredTrades.map((trade) => {
                                     const dateObj = new Date(trade.created_at);
                                     const dateStr = dateObj.toLocaleDateString(undefined, {
                                         year: 'numeric',

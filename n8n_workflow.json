@@ -1,0 +1,605 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trading-analysis",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4368,
+        672
+      ],
+      "id": "a54d63a4-05f8-462d-ab80-36c75f4d7908",
+      "name": "Webhook",
+      "webhookId": "93f1c5f3-cd88-4815-bebe-24670329703f"
+    },
+    {
+      "parameters": {
+        "url": "https://api.twelvedata.com/price?symbol=XAU/USD&apikey=6c188cfa8f314df387720769ec424b62",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4944,
+        512
+      ],
+      "id": "a4c66bc1-1f8f-4c60-9dbb-4ef5f7fc2ffa",
+      "name": "Fetch Live Price"
+    },
+    {
+      "parameters": {
+        "url": "https://www.fxstreet.com/rss/news",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        4640,
+        752
+      ],
+      "id": "b7330cdf-35ee-4eb7-8ab3-dd50251f0aec",
+      "name": "RSS FXStreet"
+    },
+    {
+      "parameters": {
+        "url": "https://forexlive.com/feed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        4640,
+        912
+      ],
+      "id": "436cb0a9-3263-4981-a8ba-ff7ef283b633",
+      "name": "RSS ForexLive"
+    },
+    {
+      "parameters": {
+        "url": "https://www.myfxbook.com/rss/latest-forex-news",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        4640,
+        1072
+      ],
+      "id": "15accec1-f47e-4746-86b4-7fbd1cb8e767",
+      "name": "RSS MyFXBook"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        4880,
+        832
+      ],
+      "id": "84149469-0324-4318-9587-7eae1b6fd539",
+      "name": "Merge FXStreet+ForexLive"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        5120,
+        912
+      ],
+      "id": "733ad2c1-e526-4794-88d1-f5f704e55409",
+      "name": "Merge All RSS Feeds"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nlet articles = [];\nallItems.forEach(item => {\n    const json = item.json;\n    const title = json.title || json.name || '';\n    const summary = json.summary || json.content || json.description || json.contentSnippet || '';\n    if (title) articles.push({ title, summary: summary.substring(0, 200) });\n});\nconst seen = new Set();\narticles = articles.filter(a => {\n    const key = a.title.toLowerCase().substring(0, 50);\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n});\narticles = articles.slice(0, 25);\nconst newsText = articles.map((a, i) =>\n    (i + 1) + '. ' + a.title + (a.summary ? ' -- ' + a.summary.substring(0, 150) : '')\n).join('\\n');\nconst systemPrompt = [\n    'You are an expert financial news analyst for XAUUSD (Gold) trading. Output STRICT JSON ONLY.',\n    '',\n    'CONTEXT RULES:',\n    '- War/conflict/escalation = BULLISH for gold (safe haven)',\n    '- Ceasefire/peace/de-escalation = BEARISH for gold',\n    '- Fed hawkish/rate hike = BEARISH. Fed dovish/rate cut/inflation = BULLISH',\n    '- Dollar weakness = BULLISH. Dollar strength = BEARISH',\n    '- Market panic/crash = BULLISH. Risk-on/stocks rally = BEARISH',\n    '- Nuclear/major military = EXTREMELY BULLISH',\n    '- Understand context: ceasefire talks COLLAPSE = BULLISH (not bearish)',\n    '',\n    'VOLATILITY: EXTREME(sl_mult=2.0,min_rr=2.5,min_sl=20) HIGH(1.5,2.0,15) ELEVATED(1.2,2.0,12) NORMAL(1.0,2.0,8)',\n    '',\n    'JSON OUTPUT FORMAT:',\n    '{\"news_sentiment\":\"BULLISH|SLIGHTLY_BULLISH|NEUTRAL|SLIGHTLY_BEARISH|BEARISH\",',\n    '\"volatility_level\":\"NORMAL|ELEVATED|HIGH|EXTREME\",',\n    '\"sl_multiplier\":1.0,\"min_rr\":2.0,\"min_sl_distance\":8,',\n    '\"extreme_caution\":false,\"extreme_caution_reason\":\"\",',\n    '\"war_news\":\"top 3 pipe-separated or No war news\",',\n    '\"fed_news\":\"top 2 pipe-separated or No Fed news\",',\n    '\"gold_news\":\"top 3 pipe-separated or No gold news\",',\n    '\"all_headlines\":\"top 6 most impactful double-pipe-separated\",',\n    '\"sentiment_reasoning\":\"2-3 sentences on market mood and gold direction\",',\n    '\"bull_score\":0,\"bear_score\":0,',\n    '\"war_news_count\":0,\"fed_news_count\":0,\"gold_news_count\":0,\"ceasefire_news_count\":0}'\n].join('\\n');\nconst userPrompt = 'Analyze these headlines for XAUUSD impact:\\n\\n' + newsText + '\\n\\nTime: ' + new Date().toISOString();\nreturn [{\n    json: {\n        request_body: {\n            model: 'deepseek/deepseek-chat',\n            messages: [\n                { role: 'system', content: systemPrompt },\n                { role: 'user', content: userPrompt }\n            ],\n            temperature: 0.2,\n            max_tokens: 800\n        },\n        total_articles: articles.length,\n        fetched_at: new Date().toISOString()\n    }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5344,
+        912
+      ],
+      "id": "e40d70cb-ee68-40e9-88ab-0efd395bd1dd",
+      "name": "Prepare News for AI"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5616,
+        912
+      ],
+      "id": "4f14def8-7847-4ef5-8731-3db20d47b408",
+      "name": "AI News Analyst"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst json = item.json;\nconst defaults = {\n    news_sentiment: 'NEUTRAL', volatility_level: 'NORMAL', sl_multiplier: 1.0, min_rr: 2.0, min_sl_distance: 8,\n    extreme_caution: false, extreme_caution_reason: '',\n    war_news: 'News AI unavailable', fed_news: 'News AI unavailable', gold_news: 'News AI unavailable',\n    all_headlines: 'News AI unavailable', sentiment_reasoning: 'AI news analysis failed. Using neutral defaults.',\n    bull_score: 0, bear_score: 0, war_news_count: 0, fed_news_count: 0, gold_news_count: 0, ceasefire_news_count: 0,\n    total_articles: 0, news_fetched_at: new Date().toISOString(), ai_powered: false\n};\nlet aiText = '';\ntry {\n    if (json.choices && json.choices[0] && json.choices[0].message) {\n        aiText = json.choices[0].message.content || '';\n    }\n} catch (e) { return [{ json: defaults }]; }\nif (!aiText) { return [{ json: defaults }]; }\nlet cleaned = aiText.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\nconst firstBrace = cleaned.indexOf('{');\nconst lastBrace = cleaned.lastIndexOf('}');\nlet data = {};\nif (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {\n    try { data = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1)); }\n    catch (e) { defaults.extreme_caution_reason = 'Parse error: ' + e.message; return [{ json: defaults }]; }\n} else { return [{ json: defaults }]; }\nconst validS = ['BULLISH', 'SLIGHTLY_BULLISH', 'NEUTRAL', 'SLIGHTLY_BEARISH', 'BEARISH'];\nconst validV = ['NORMAL', 'ELEVATED', 'HIGH', 'EXTREME'];\nconst sentiment = validS.includes(data.news_sentiment) ? data.news_sentiment : 'NEUTRAL';\nconst volatility = validV.includes(data.volatility_level) ? data.volatility_level : 'NORMAL';\nconst slMult = Math.min(Math.max(parseFloat(data.sl_multiplier) || 1.0, 1.0), 2.5);\nconst minRR = Math.min(Math.max(parseFloat(data.min_rr) || 2.0, 1.5), 3.0);\nconst minSL = Math.min(Math.max(parseInt(data.min_sl_distance) || 8, 5), 30);\nlet totalArticles = 0, fetchedAt = new Date().toISOString();\ntry { const p = $('Prepare News for AI').first(); totalArticles = p.json.total_articles || 0; fetchedAt = p.json.fetched_at || fetchedAt; } catch (e) { }\nreturn [{\n    json: {\n        news_sentiment: sentiment, volatility_level: volatility, sl_multiplier: slMult, min_rr: minRR, min_sl_distance: minSL,\n        extreme_caution: !!data.extreme_caution, extreme_caution_reason: data.extreme_caution_reason || '',\n        war_news: data.war_news || 'No war news', fed_news: data.fed_news || 'No Fed news',\n        gold_news: data.gold_news || 'No gold news', all_headlines: data.all_headlines || 'No headlines',\n        sentiment_reasoning: data.sentiment_reasoning || '', bull_score: parseInt(data.bull_score) || 0,\n        bear_score: parseInt(data.bear_score) || 0, war_news_count: parseInt(data.war_news_count) || 0,\n        fed_news_count: parseInt(data.fed_news_count) || 0, gold_news_count: parseInt(data.gold_news_count) || 0,\n        ceasefire_news_count: parseInt(data.ceasefire_news_count) || 0,\n        total_articles: totalArticles, news_fetched_at: fetchedAt, ai_powered: true\n    }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5888,
+        912
+      ],
+      "id": "fe91d35f-7c67-41bc-9be6-97f2d361a759",
+      "name": "Parse News AI Response"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        6080,
+        672
+      ],
+      "id": "6889062c-adf0-4802-9e89-f5014187d2d8",
+      "name": "Merge Price + News"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems=$input.all();\nlet price=null,newsData={};\nallItems.forEach(item=>{\n  const json=item.json;\n  if(json.price!==undefined) price=json.price;\n  if(json.news_sentiment!==undefined) newsData=json;\n});\n\n// === PHILIPPINE TIME & SESSION DETECTION ===\nconst now = new Date();\nconst utcHour = now.getUTCHours();\nconst utcMinute = now.getUTCMinutes();\nconst phtHour = (utcHour + 8) % 24;\nconst phtMinute = utcMinute;\nconst phtTimeStr = String(phtHour).padStart(2,'0') + ':' + String(phtMinute).padStart(2,'0');\nconst phtPeriod = phtHour >= 12 ? 'PM' : 'AM';\nconst phtHour12 = phtHour === 0 ? 12 : (phtHour > 12 ? phtHour - 12 : phtHour);\nconst phtTime12 = phtHour12 + ':' + String(phtMinute).padStart(2,'0') + ' ' + phtPeriod;\nconst phtDate = new Date(now.getTime() + 8*60*60*1000);\nconst phtDay = phtDate.getUTCDay();\nconst dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];\nconst phtDayName = dayNames[phtDay];\nconst phtDateStr = phtDate.toISOString().split('T')[0];\n\nlet sessions = [];\nlet sessionWarnings = [];\nlet sessionTips = [];\n\nif (utcHour >= 0 && utcHour < 8) sessions.push('ASIAN');\nif (utcHour >= 7 && utcHour < 16) sessions.push('LONDON');\nif (utcHour >= 13 && utcHour < 22) sessions.push('NEW_YORK');\nif (utcHour >= 13 && utcHour < 16) sessions.push('GOLDEN_HOUR');\nif (utcHour >= 22 || utcHour < 0) sessions.push('DANGER_ZONE');\n\nconst activeSession = sessions.length > 0 ? sessions.join(' + ') : 'OFF_MARKET';\n\nif (sessions.includes('DANGER_ZONE')) {\n  sessionWarnings.push('DANGER ZONE active (PHT 6-8AM). Thin liquidity, erratic spikes.');\n  sessionTips.push('Avoid entries. Wait for Asian session open at 8AM PHT.');\n}\nif (sessions.includes('GOLDEN_HOUR')) {\n  sessionTips.push('GOLDEN HOUR active (PHT 9PM-12AM). Peak volatility. Ideal for entries.');\n}\nif (sessions.includes('ASIAN') && !sessions.includes('LONDON')) {\n  sessionTips.push('Asian session (PHT 8AM-4PM). Range-bound, lower volatility. Tighter targets.');\n  sessionWarnings.push('Asian session: Gold often consolidates. Breakout trades riskier.');\n}\nif (sessions.includes('LONDON') && !sessions.includes('NEW_YORK')) {\n  sessionTips.push('London session (PHT 3PM-12AM). Strong directional moves.');\n}\nif (sessions.includes('NEW_YORK') && !sessions.includes('LONDON')) {\n  sessionTips.push('NY session only (after London close). Watch for reversals.');\n}\n\nlet isWeekend = false;\nif (phtDay === 0 || phtDay === 6) {\n  isWeekend = true;\n  sessionWarnings.push('WEEKEND: Market is closed.');\n}\n\nreturn[{json:{\n  price:price||'0',\n  war_news:newsData.war_news||'No war news',\n  fed_news:newsData.fed_news||'No Fed news',\n  gold_news:newsData.gold_news||'No gold news',\n  all_headlines:newsData.all_headlines||'No headlines',\n  news_sentiment:newsData.news_sentiment||'NEUTRAL',\n  volatility_level:newsData.volatility_level||'NORMAL',\n  sl_multiplier:newsData.sl_multiplier||1.0,\n  min_rr:newsData.min_rr||2.0,\n  min_sl_distance:newsData.min_sl_distance||8,\n  extreme_caution:newsData.extreme_caution||false,\n  extreme_caution_reason:newsData.extreme_caution_reason||'',\n  total_articles:newsData.total_articles||0,\n  war_news_count:newsData.war_news_count||0,\n  bull_score:newsData.bull_score||0,\n  bear_score:newsData.bear_score||0,\n  news_fetched_at:newsData.news_fetched_at||new Date().toISOString(),\n  sentiment_reasoning:newsData.sentiment_reasoning||'',\n  ai_powered:newsData.ai_powered||false,\n  pht_time:phtTime12,\n  pht_time_24h:phtTimeStr,\n  pht_date:phtDateStr,\n  pht_day:phtDayName,\n  active_session:activeSession,\n  session_warnings:sessionWarnings.join(' | ')||'None',\n  session_tips:sessionTips.join(' | ')||'No tips',\n  is_weekend:isWeekend,\n  is_danger_zone:sessions.includes('DANGER_ZONE'),\n  is_golden_hour:sessions.includes('GOLDEN_HOUR')\n}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6352,
+        672
+      ],
+      "id": "a1fa6ea1-542a-47ac-a43a-35cde3eee240",
+      "name": "Combine Price+News Data"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        6672,
+        528
+      ],
+      "id": "4ddbe0fa-5c2a-4d15-aeba-24d3647e2437",
+      "name": "Merge Images + Data"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "text": "=### SYSTEM INSTRUCTION: RETURN ONLY VALID JSON. NO MARKDOWN. NO CONVERSATION. NO EXPLANATION OUTSIDE JSON.\n\n### YOUR ROLE: CHART ANALYST ONLY\nYou are a CHART READING specialist. Your job is to ANALYZE what you see on the charts and EXTRACT technical data. You do NOT make trading decisions — a separate Decision Maker AI will do that based on your analysis.\n\n### CHARTS PROVIDED\n- image_4h: 4-Hour chart (each candle = 4 hours)\n- image_1h: 1-Hour chart (each candle = 1 hour)\n- image_15m: 15-Minute chart (each candle = 15 minutes)\n\n### LIVE PRICE ANCHOR: ${{$json.price}}\nALL prices you read from charts MUST be within $100 of ${{$json.price}}.\nIf Y-axis numbers are NOT near ${{$json.price}}, report \"y_axis_mismatch\": true.\n\n### Y-AXIS READING PROCEDURE (do FIRST)\nA) Look at RIGHT edge of each chart. Read the vertical price scale.\nB) Read TOPMOST and BOTTOMMOST visible numbers on each chart.\nC) Read the number closest to current price line on 15M chart.\nD) If prices read are NOT near ${{$json.price}} → set y_axis_mismatch: true\n\n### WHAT TO EXTRACT FROM EACH CHART\n\n**4H CHART (image_4h):**\n- Overall trend: bullish (HH+HL), bearish (LH+LL), or ranging\n- Any Break of Structure (BOS) — where and in which direction\n- Nearest unmitigated 4H Order Block (price level + bullish or bearish)\n- Any 4H Fair Value Gap (price range)\n- Draw on Liquidity targets (equal highs/lows, session extremes)\n- Key support/resistance levels visible\n\n**1H CHART (image_1h):**\n- Does 1H structure align with 4H trend?\n- Any Change of Character (CHoCH) observed?\n- Is price in Premium (upper half) or Discount (lower half) of the range?\n- Nearest 1H Order Block or Supply/Demand zone (price level)\n- Any 1H FVG visible?\n\n**15M CHART (image_15m):**\n- Recent swing high price (read from Y-axis)\n- Recent swing low price (read from Y-axis)\n- Has a liquidity sweep occurred? (price spiked beyond swing high/low then reversed)\n- If sweep: which direction (swept lows = bullish setup, swept highs = bearish setup)\n- After sweep: is there a Market Structure Shift (MSS)? (strong displacement candle breaking structure)\n- MSS candle characteristics: size relative to recent candles, direction, body vs wick ratio\n- Nearest 15M Order Block after MSS (price level)\n- Nearest 15M Fair Value Gap after MSS (price range)\n- Current price position relative to the entry zone\n\n### OUTPUT (STRICT JSON ONLY)\n{\n  \"y_axis_mismatch\": false,\n  \"y_axis_15m_top\": 0,\n  \"y_axis_15m_bottom\": 0,\n  \"y_axis_15m_current\": 0,\n\n  \"gate1_4h\": {\n    \"trend\": \"bullish | bearish | ranging\",\n    \"bos_confirmed\": true,\n    \"bos_direction\": \"bullish | bearish | none\",\n    \"nearest_ob_price\": 0,\n    \"nearest_ob_type\": \"bullish | bearish | none\",\n    \"fvg_range\": \"price1-price2 | none\",\n    \"draw_on_liquidity\": \"description of target\",\n    \"key_levels\": \"price1, price2, price3\",\n    \"analysis\": \"2-3 sentences describing what you see on 4H\"\n  },\n\n  \"gate2_1h\": {\n    \"aligns_with_4h\": true,\n    \"choch_observed\": false,\n    \"choch_direction\": \"bullish | bearish | none\",\n    \"premium_or_discount\": \"premium | discount | mid-range\",\n    \"nearest_ob_price\": 0,\n    \"nearest_ob_type\": \"bullish | bearish | none\",\n    \"fvg_range\": \"price1-price2 | none\",\n    \"analysis\": \"2-3 sentences describing what you see on 1H\"\n  },\n\n  \"gate3_15m\": {\n    \"recent_swing_high\": 0,\n    \"recent_swing_low\": 0,\n    \"liquidity_sweep_occurred\": false,\n    \"sweep_direction\": \"swept_lows | swept_highs | none\",\n    \"sweep_price\": 0,\n    \"mss_confirmed\": false,\n    \"mss_direction\": \"bullish | bearish | none\",\n    \"mss_candle_strength\": \"strong | moderate | weak | none\",\n    \"entry_ob_price\": 0,\n    \"entry_fvg_range\": \"price1-price2 | none\",\n    \"current_price_vs_entry\": \"at zone | above zone | below zone | no zone\",\n    \"analysis\": \"2-3 sentences describing what you see on 15M\"\n  },\n\n  \"overall_chart_summary\": \"3-4 sentences summarizing what ALL charts show. Focus on facts only.\"\n}\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        6944,
+        528
+      ],
+      "id": "08d2cd24-026a-47c0-aa0e-ff5e79d05339",
+      "name": "Gemini Analyze",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CyuKt3kabfQEIPu0",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst json = item.json;\nlet rawResponse = '';\n\nif (json.content && json.content.parts && json.content.parts[0] && json.content.parts[0].text) {\n    rawResponse = json.content.parts[0].text;\n}\n\nconst errorResult = {\n    chart_analysis_failed: true,\n    error: 'No response from Gemini',\n    gate1_4h: {trend:'unknown', analysis:'Gemini returned no response'},\n    gate2_1h: {aligns_with_4h:false, analysis:'Gemini returned no response'},\n    gate3_15m: {liquidity_sweep_occurred:false, mss_confirmed:false, analysis:'Gemini returned no response'},\n    overall_chart_summary: 'Chart analysis unavailable'\n};\n\nif (!rawResponse) {\n    return [{json: errorResult}];\n}\n\nlet cleaned = rawResponse.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '');\nconst firstBrace = cleaned.indexOf('{');\nconst lastBrace = cleaned.lastIndexOf('}');\nlet data = {};\n\nif (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {\n    try {\n        data = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));\n    } catch (e) {\n        errorResult.error = 'JSON parse failed: ' + e.message;\n        return [{json: errorResult}];\n    }\n} else {\n    errorResult.error = 'No JSON found in response';\n    return [{json: errorResult}];\n}\n\nreturn [{json: {\n    chart_analysis_failed: false,\n    y_axis_mismatch: data.y_axis_mismatch || false,\n    y_axis_15m_top: data.y_axis_15m_top || 0,\n    y_axis_15m_bottom: data.y_axis_15m_bottom || 0,\n    y_axis_15m_current: data.y_axis_15m_current || 0,\n    gate1_4h: data.gate1_4h || {},\n    gate2_1h: data.gate2_1h || {},\n    gate3_15m: data.gate3_15m || {},\n    overall_chart_summary: data.overall_chart_summary || 'No summary'\n}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7216,
+        528
+      ],
+      "id": "da576f7d-c72c-4d0a-bdb8-549dc370473a",
+      "name": "Parse Gemini Chart Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chartData = $('Parse Gemini Chart Data').first().json;\nconst contextData = $('Combine Price+News Data').first().json;\n\nconst systemPrompt = `You are the FINAL DECISION MAKER for XAUUSD (Gold) trades using Smart Money Concepts (SMC/ICT).\n\nYou receive CHART ANALYSIS from a vision AI that read the actual charts, plus NEWS data and SESSION context.\nYour job: Apply SMC trading logic to decide BUY, SELL, or WAIT.\n\n### CRITICAL: PRICE LEVEL RULES FOR XAUUSD\nXAUUSD typically moves $20-$80 per session. Your SL and TP must reflect this reality.\n- MINIMUM Stop Loss distance: $15 from entry (absolute minimum for gold)\n- MAXIMUM Stop Loss distance: $80 from entry\n- MINIMUM Take Profit distance: $25 from entry (gold moves in big swings)\n- TP should target the nearest unmitigated 4H/1H OB, FVG, or Draw on Liquidity\n- If you cannot find a TP at least $25 from entry → WAIT\n\n### MANDATORY MATH CHECK (DO THIS BEFORE OUTPUTTING)\nBefore you write your final JSON, you MUST calculate and verify:\n1. sl_distance = |entry_price - stop_loss|\n2. tp_distance = |entry_price - take_profit|\n3. rr_ratio = tp_distance / sl_distance\n4. CHECK: sl_distance >= $15? If NO → INVALID → WAIT\n5. CHECK: sl_distance <= $80? If NO → INVALID → WAIT\n6. CHECK: tp_distance >= $25? If NO → INVALID → WAIT\n7. CHECK: rr_ratio >= 2.0? (ASIAN session: >= 2.5) If NO → INVALID → WAIT\n8. CHECK: For SELL, is stop_loss ABOVE entry_price? If NO → INVALID\n9. CHECK: For SELL, is take_profit BELOW entry_price? If NO → INVALID\n10. CHECK: For BUY, is stop_loss BELOW entry_price? If NO → INVALID\n11. CHECK: For BUY, is take_profit ABOVE entry_price? If NO → INVALID\n\nIf ANY check fails → change signal to WAIT and explain which check failed.\n\nEXAMPLE OF CORRECT SELL:\n- Entry: $5084, SL: $5104 (+$20 above), TP: $5040 (-$44 below), RR = 44/20 = 1:2.2 ✅\nEXAMPLE OF INCORRECT SELL (what NOT to do):\n- Entry: $5084, SL: $5093 (+$9 above), TP: $5075 (-$9 below), RR = 9/9 = 1:1 ❌ (SL too tight, TP too tight, RR too low)\n\n### DECISION FRAMEWORK\n\nGATE 1 — 4H Bias:\n- Need clear trend (HH+HL = bullish, LH+LL = bearish) with BOS confirmed\n- IMPORTANT: If Gemini says \"bullish\" but describes falling price / lower structure → the trend is actually BEARISH. Use the described price action, not just the label.\n- No clear trend → WAIT\n\nGATE 2 — 1H Confirmation:\n- Must align with 4H bias\n- CHoCH against 4H = WAIT\n- Check premium/discount positioning\n\nGATE 3 — 15M Entry:\n- MUST have liquidity sweep (price beyond swing high/low then reversed)\n- MUST have MSS (Market Structure Shift) after sweep\n- Entry at 15M OB or FVG\n- No sweep + MSS → WAIT\n\n### TREND DIRECTION CROSS-CHECK\nIMPORTANT: Verify the chart analyst's trend assessment against the price data:\n- If 4H \"trend\" says \"bullish\" but key_levels show declining prices → trend is BEARISH\n- If 4H \"trend\" says \"bearish\" but key_levels show rising prices → trend is BULLISH\n- If there is a contradiction between trend label and price action → trust the PRICE ACTION\n- A SELL signal with a \"bullish 4H\" is a CONTRADICTION → WAIT unless you can confirm 4H is actually bearish\n\n### NEWS RULES\n- BUY signal + BEARISH news → WAIT\n- SELL signal + BULLISH news → WAIT\n- Extreme caution active → WAIT\n- adjusted_SL = base_SL × sl_multiplier. If > $80 → WAIT\n\n### SESSION RULES (Philippine Time / PHT / UTC+8)\n- DANGER ZONE (6-8 AM PHT): Strongly prefer WAIT, need 85+ confidence\n- WEEKEND: WAIT immediately\n- ASIAN only (8AM-4PM PHT): Tighter TP targets, RR >= 2.5\n- GOLDEN HOUR (9PM-12AM PHT): Best window, +5 confidence bonus\n- Always mention PHT time and session in reasoning\n- Express all wait times in PHT\n\n### RISK PARAMETERS\n- Entry: within $30 of live price\n- Stop Loss: beyond the swept swing + $5-$10 buffer. MINIMUM $15 from entry, MAXIMUM $80.\n- SL adjusted by: base × sl_multiplier\n- Take Profit: nearest unmitigated 4H/1H OB, FVG, or liquidity target\n  - MINIMUM $25 from entry\n  - Typical good TP: $30-$60 from entry\n  - Look at 1H and 4H key levels for realistic targets\n- RR minimum: 2.0 (ASIAN: 2.5)\n- If adjusted SL > $80 → WAIT\n- If TP < $25 from entry → WAIT\n\n### PRICE VALIDATION\nALL prices must be near the live price. If chart analyst reported y_axis_mismatch → WAIT.\n- entry within $30 of live price\n- SL within $80 of live price  \n- TP within $150 of live price\nIf any price fails → WAIT\n\n### CONFIDENCE SCORING\n- 90-100: All gates pass + sweep + MSS + OB/FVG + RR>=2.5 + news confirms + Golden Hour\n- 70-89: All gates + trigger + RR>=2.0 + news ok\n- 50-69: 2 gates pass, not all confirmed\n- Below 50: WAIT\n- Deductions: EXTREME=-15, HIGH=-10, ELEVATED=-5, no articles=-10\n- Session: DANGER_ZONE=-15, ASIAN_ONLY=-5, GOLDEN_HOUR=+5\n\n### WAIT RESPONSE REQUIREMENTS\nA. failed_candle: Exact description (e.g. \"15M no liquidity sweep yet\")  \nB. wait_time: With PHT time (e.g. \"Wait 45 min — recheck at 9:30 PM PHT\")\nC. next_step: \"STEP 1: [watch]. STEP 2: [look for]. STEP 3: [when in PHT]. STEP 4: [valid entry description]\"\n\n### OUTPUT FORMAT (STRICT JSON ONLY)\n{\n  \"signal\": \"BUY | SELL | WAIT\",\n  \"confidence_score\": 0-100,\n  \"asset_name\": \"XAUUSD\",\n  \"entry_price\": 0,\n  \"stop_loss\": 0,\n  \"take_profit\": 0,\n  \"sl_distance\": 0,\n  \"tp_distance\": 0,\n  \"rr_ratio\": \"1:X or 0\",\n  \"math_check\": \"sl=$X tp=$X rr=1:X — ALL CHECKS PASSED | FAILED: reason\",\n  \"setup_name\": \"15M OB Entry | 15M FVG Entry | No Setup\",\n  \"failed_timeframe\": \"4H | 1H | 15M | NEWS | RR | SESSION | MATH | none\",\n  \"failed_candle\": \"exact description | none\",\n  \"failed_step\": \"Gate X: description | none\",\n  \"wait_time\": \"exact wait time in PHT | none\",\n  \"next_step\": \"STEP 1: ... STEP 2: ... STEP 3: ... STEP 4: ... | none\",\n  \"reasoning\": \"2-3 sentences with session context and PHT time. Must not contradict signal direction.\",\n  \"recheck_after\": \"specific instruction with PHT time\",\n  \"news_sentiment\": \"from input\",\n  \"volatility_level\": \"from input\",\n  \"sl_adjusted\": true/false,\n  \"sl_multiplier_used\": 1.0,\n  \"news_summary\": \"1 sentence max\",\n  \"pht_time\": \"from input\",\n  \"active_session\": \"from input\"\n}`;\n\nconst chartJSON = JSON.stringify(chartData, null, 2);\n\nconst userPrompt = 'MAKE YOUR TRADING DECISION based on the following data:\\n\\n' +\n'=== LIVE PRICE ===\\n$' + contextData.price + '\\n\\n' +\n'=== CHART ANALYSIS (from vision AI) ===\\n' + chartJSON + '\\n\\n' +\n'=== NEWS CONTEXT ===\\n' +\n'Sentiment: ' + contextData.news_sentiment + '\\n' +\n'Volatility: ' + contextData.volatility_level + '\\n' +\n'SL Multiplier: ' + contextData.sl_multiplier + 'x\\n' +\n'Min RR: ' + contextData.min_rr + '\\n' +\n'Min SL Distance: $' + contextData.min_sl_distance + '\\n' +\n'Extreme Caution: ' + contextData.extreme_caution + '\\n' +\n'Caution Reason: ' + (contextData.extreme_caution_reason || 'None') + '\\n' +\n'War News: ' + contextData.war_news + '\\n' +\n'Fed News: ' + contextData.fed_news + '\\n' +\n'Gold News: ' + contextData.gold_news + '\\n' +\n'News Summary: ' + contextData.sentiment_reasoning + '\\n' +\n'Bull Score: ' + contextData.bull_score + ' | Bear Score: ' + contextData.bear_score + '\\n' +\n'Total Articles: ' + contextData.total_articles + '\\n\\n' +\n'=== SESSION CONTEXT (Philippine Time) ===\\n' +\n'PHT Time: ' + contextData.pht_time + ' (' + contextData.pht_time_24h + ')\\n' +\n'Date: ' + contextData.pht_date + ' (' + contextData.pht_day + ')\\n' +\n'Active Session: ' + contextData.active_session + '\\n' +\n'Weekend: ' + contextData.is_weekend + '\\n' +\n'Danger Zone: ' + contextData.is_danger_zone + '\\n' +\n'Golden Hour: ' + contextData.is_golden_hour + '\\n' +\n'Session Warnings: ' + contextData.session_warnings + '\\n' +\n'Session Tips: ' + contextData.session_tips + '\\n\\n' +\n'REMINDER: Before outputting, run the MANDATORY MATH CHECK:\\n' +\n'1. sl_distance = |entry - SL| must be >= $15\\n' +\n'2. tp_distance = |entry - TP| must be >= $25\\n' +\n'3. rr = tp_distance / sl_distance must be >= 2.0\\n' +\n'4. For SELL: SL must be ABOVE entry, TP must be BELOW entry\\n' +\n'5. For BUY: SL must be BELOW entry, TP must be ABOVE entry\\n' +\n'If ANY check fails → signal must be WAIT.\\n\\n' +\n'Now analyze all the data above and return your FINAL TRADING DECISION as JSON.';\n\nreturn [{\n    json: {\n        request_body: {\n            model: 'qwen/qwen-2.5-72b-instruct',\n            messages: [\n                { role: 'system', content: systemPrompt },\n                { role: 'user', content: userPrompt }\n            ],\n            temperature: 0.15,\n            max_tokens: 1500\n        }\n    }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7486,
+        528
+      ],
+      "id": "aaa11111-qwen-prep-node-id-0001",
+      "name": "Prepare Qwen Decision"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7756,
+        528
+      ],
+      "id": "bbb22222-qwen-http-node-id-0002",
+      "name": "Qwen Decision Maker"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst json = item.json;\n\nconst defaults = {\n    asset_name: 'XAUUSD', signal_type: 'WAIT', signal: 'WAIT', confidence: 0,\n    entry_price: 0, stop_loss: 0, take_profit: 0, rr_ratio: '0',\n    reasoning: 'Qwen Decision Maker returned no response.',\n    setup_type: 'No Setup', outcome: 'pending',\n    failed_timeframe: 'none', failed_candle: 'Qwen returned no response',\n    failed_step: 'none', wait_time: 'Retry in 5 minutes',\n    next_step: 'STEP 1: Check API. STEP 2: Re-run. STEP 3: Check logs. STEP 4: Retry.',\n    recheck_after: 'Fix API connection',\n    news_sentiment: 'UNKNOWN', volatility_level: 'UNKNOWN',\n    sl_adjusted: false, sl_multiplier_used: 1,\n    news_summary: 'No response', pht_time: '', active_session: '',\n    math_check: 'No response'\n};\n\nlet aiText = '';\ntry {\n    if (json.choices && json.choices[0] && json.choices[0].message) {\n        aiText = json.choices[0].message.content || '';\n    }\n} catch (e) { return [{ json: defaults }]; }\n\nif (!aiText) { return [{ json: defaults }]; }\n\nlet cleaned = aiText.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\nconst firstBrace = cleaned.indexOf('{');\nconst lastBrace = cleaned.lastIndexOf('}');\nlet data = {};\n\nif (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {\n    try {\n        data = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));\n    } catch (e) {\n        defaults.reasoning = 'JSON parse failed: ' + e.message;\n        defaults.failed_candle = 'Parse error in Qwen response';\n        return [{ json: defaults }];\n    }\n} else {\n    return [{ json: defaults }];\n}\n\nlet signal = (data.signal || 'WAIT').toUpperCase();\nconst entry = data.entry_price ? parseFloat(data.entry_price) : 0;\nconst sl = data.stop_loss ? parseFloat(data.stop_loss) : 0;\nconst tp = data.take_profit ? parseFloat(data.take_profit) : 0;\n\n// === HARD VALIDATION: Override bad signals ===\nif (signal !== 'WAIT' && entry > 0 && sl > 0 && tp > 0) {\n    const slDist = Math.abs(entry - sl);\n    const tpDist = Math.abs(entry - tp);\n    const rr = slDist > 0 ? tpDist / slDist : 0;\n    \n    let mathFailed = false;\n    let mathReason = '';\n    \n    // Check minimum SL distance ($15)\n    if (slDist < 15) {\n        mathFailed = true;\n        mathReason += 'SL too close: $' + slDist.toFixed(2) + ' (min $15). ';\n    }\n    // Check maximum SL distance ($80)\n    if (slDist > 80) {\n        mathFailed = true;\n        mathReason += 'SL too far: $' + slDist.toFixed(2) + ' (max $80). ';\n    }\n    // Check minimum TP distance ($25)\n    if (tpDist < 25) {\n        mathFailed = true;\n        mathReason += 'TP too close: $' + tpDist.toFixed(2) + ' (min $25). ';\n    }\n    // Check RR >= 2.0\n    if (rr < 2.0) {\n        mathFailed = true;\n        mathReason += 'RR too low: 1:' + rr.toFixed(1) + ' (min 1:2.0). ';\n    }\n    // Check direction consistency\n    if (signal === 'SELL' && sl < entry) {\n        mathFailed = true;\n        mathReason += 'SELL but SL below entry (should be above). ';\n    }\n    if (signal === 'SELL' && tp > entry) {\n        mathFailed = true;\n        mathReason += 'SELL but TP above entry (should be below). ';\n    }\n    if (signal === 'BUY' && sl > entry) {\n        mathFailed = true;\n        mathReason += 'BUY but SL above entry (should be below). ';\n    }\n    if (signal === 'BUY' && tp < entry) {\n        mathFailed = true;\n        mathReason += 'BUY but TP below entry (should be above). ';\n    }\n    \n    // Override to WAIT if math failed\n    if (mathFailed) {\n        signal = 'WAIT';\n        data.failed_timeframe = 'MATH';\n        data.failed_candle = 'Math validation failed: ' + mathReason.trim();\n        data.failed_step = 'Math Check: ' + mathReason.trim();\n        data.reasoning = (data.reasoning || '') + ' [OVERRIDDEN TO WAIT: ' + mathReason.trim() + ']';\n        data.wait_time = 'Wait 15-30 min for better price structure with wider SL/TP zones';\n        data.confidence_score = Math.min(parseInt(data.confidence_score) || 0, 40);\n    }\n}\n\nreturn [{json: {\n    asset_name: data.asset_name || 'XAUUSD',\n    signal_type: signal,\n    signal: signal,\n    confidence: parseInt(data.confidence_score) || 0,\n    entry_price: entry,\n    stop_loss: sl,\n    take_profit: tp,\n    rr_ratio: data.rr_ratio || '0',\n    reasoning: data.reasoning || 'No reasoning.',\n    setup_type: data.setup_name || 'No Setup',\n    outcome: 'pending',\n    failed_timeframe: data.failed_timeframe || 'none',\n    failed_candle: data.failed_candle || 'none',\n    failed_step: data.failed_step || 'none',\n    wait_time: data.wait_time || 'none',\n    next_step: data.next_step || 'none',\n    recheck_after: data.recheck_after || '',\n    news_sentiment: data.news_sentiment || 'UNKNOWN',\n    volatility_level: data.volatility_level || 'UNKNOWN',\n    sl_adjusted: data.sl_adjusted || false,\n    sl_multiplier_used: data.sl_multiplier_used || 1,\n    news_summary: data.news_summary || 'No news context',\n    pht_time: data.pht_time || '',\n    active_session: data.active_session || '',\n    math_check: data.math_check || ''\n}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8026,
+        528
+      ],
+      "id": "ccc33333-parse-qwen-node-id-0003",
+      "name": "Parse Qwen Decision"
+    },
+    {
+      "parameters": {
+        "tableId": "trading_signals",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "asset_name",
+              "fieldValue": "={{ $json.asset_name }}"
+            },
+            {
+              "fieldId": "signal_type",
+              "fieldValue": "={{ $json.signal_type }}"
+            },
+            {
+              "fieldId": "confidence",
+              "fieldValue": "={{ $json.confidence }}"
+            },
+            {
+              "fieldId": "stop_loss",
+              "fieldValue": "={{ $json.stop_loss }}"
+            },
+            {
+              "fieldId": "take_profit",
+              "fieldValue": "={{ $json.take_profit }}"
+            },
+            {
+              "fieldId": "reasoning",
+              "fieldValue": "={{ $json.reasoning }}"
+            },
+            {
+              "fieldId": "setup_type",
+              "fieldValue": "={{ $json.setup_type }}"
+            },
+            {
+              "fieldId": "outcome",
+              "fieldValue": "=pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        8296,
+        528
+      ],
+      "id": "1d7052b7-c68c-4b4f-afc9-7e2c8f8ab1f7",
+      "name": "Save to Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "RCMOziR56IjI1jP6",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        8566,
+        528
+      ],
+      "id": "90e2c08d-82c5-4a75-999f-6bb768c2705c",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Live Price",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS FXStreet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS ForexLive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS MyFXBook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Images + Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Live Price": {
+      "main": [
+        [
+          {
+            "node": "Merge Price + News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS FXStreet": {
+      "main": [
+        [
+          {
+            "node": "Merge FXStreet+ForexLive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS ForexLive": {
+      "main": [
+        [
+          {
+            "node": "Merge FXStreet+ForexLive",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS MyFXBook": {
+      "main": [
+        [
+          {
+            "node": "Merge All RSS Feeds",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge FXStreet+ForexLive": {
+      "main": [
+        [
+          {
+            "node": "Merge All RSS Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All RSS Feeds": {
+      "main": [
+        [
+          {
+            "node": "Prepare News for AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare News for AI": {
+      "main": [
+        [
+          {
+            "node": "AI News Analyst",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI News Analyst": {
+      "main": [
+        [
+          {
+            "node": "Parse News AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse News AI Response": {
+      "main": [
+        [
+          {
+            "node": "Merge Price + News",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Price + News": {
+      "main": [
+        [
+          {
+            "node": "Combine Price+News Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Price+News Data": {
+      "main": [
+        [
+          {
+            "node": "Merge Images + Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Images + Data": {
+      "main": [
+        [
+          {
+            "node": "Gemini Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Analyze": {
+      "main": [
+        [
+          {
+            "node": "Parse Gemini Chart Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Gemini Chart Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Qwen Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Qwen Decision": {
+      "main": [
+        [
+          {
+            "node": "Qwen Decision Maker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen Decision Maker": {
+      "main": [
+        [
+          {
+            "node": "Parse Qwen Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Qwen Decision": {
+      "main": [
+        [
+          {
+            "node": "Save to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f7a504eea72551d4300732f1f3e9c3d8ed38acda69d4e3cb8a07b25a046eb8fb"
+  }
+}
