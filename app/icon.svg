@@ -1,0 +1,8 @@
+<svg width="256" height="256" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Amber 400 -->
+    <path d="M13.5 6.5L19.5 10V17L13.5 20.5L7.5 17V10L13.5 6.5Z" fill="#fbbf24" />
+    <!-- Yellow 400 -->
+    <path d="M26.5 6.5L32.5 10V17L26.5 20.5L20.5 17V10L26.5 6.5Z" fill="#facc15" />
+    <!-- Orange 400 -->
+    <path d="M20 17.5L26 21V28L20 31.5L14 28V21L20 17.5Z" fill="#fb923c" />
+</svg>
