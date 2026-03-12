@@ -2,8 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { useState } from 'react';
-import { Loader2, Mail, Lock, Phone } from 'lucide-react';
-import { toast, Toaster } from 'sonner';
+import { Loader2, Mail, Lock, Phone, User as UserIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 
@@ -13,13 +12,16 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
+    const [authError, setAuthError] = useState<string | null>(null);
     const router = useRouter();
     const supabase = createClient();
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+        setAuthError(null);
 
         try {
             if (isLogin) {
@@ -28,12 +30,11 @@ export default function LoginPage() {
                     password,
                 });
                 if (error) throw error;
-                toast.success("Successfully logged in!");
                 router.push('/');
                 router.refresh();
             } else {
                 if (password !== confirmPassword) {
-                    toast.error("Sign up failed", { description: "Passwords do not match." });
+                    setAuthError("Passwords do not match");
                     setIsLoading(false);
                     return;
                 }
@@ -42,6 +43,7 @@ export default function LoginPage() {
                     password,
                     options: {
                         data: {
+                            full_name: name,
                             phone_number: phone,
                         },
                         emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -50,16 +52,16 @@ export default function LoginPage() {
                 if (error) throw error;
 
                 if (data.session) {
-                    toast.success("Successfully signed up!");
                     router.push('/');
                     router.refresh();
                 } else {
-                    toast.success("Success! Check your email to confirm your account.");
+                    setAuthError("Account created! Please verify your email.");
                     setIsLogin(true); // Switch back to login view
                 }
             }
         } catch (error: any) {
-            toast.error(isLogin ? "Failed to login" : "Failed to sign up", { description: error.message });
+            console.error(isLogin ? "Failed to login" : "Failed to sign up", error);
+            setAuthError(error.message || "An authentication error occurred");
         } finally {
             setIsLoading(false);
         }
@@ -77,7 +79,7 @@ export default function LoginPage() {
 
             if (error) throw error;
         } catch (error: any) {
-            toast.error("Failed to login", { description: error.message });
+            console.error("Failed to login", error);
             setIsLoading(false);
         }
     };
@@ -89,8 +91,6 @@ export default function LoginPage() {
             <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-2)' }}></div>
 
             <div className="w-full max-w-sm relative z-10 py-10 my-auto">
-                <Toaster position="top-right" richColors />
-
                 <MotionConfig transition={{ duration: 0.4, ease: "easeInOut" }}>
                     <motion.div
                         layout
@@ -139,28 +139,49 @@ export default function LoginPage() {
                         <AnimatePresence initial={false}>
                             {!isLogin && (
                                 <motion.div
-                                    key="phoneInput"
+                                    key="signupExtraInputs"
                                     initial={{ opacity: 0, height: 0, scale: 0.95, margin: 0 }}
                                     animate={{ opacity: 1, height: "auto", scale: 1, marginTop: 4, marginBottom: 4 }}
                                     exit={{ opacity: 0, height: 0, scale: 0.95, margin: 0 }}
-                                    className="flex flex-col gap-1 overflow-hidden"
+                                    className="flex flex-col gap-3 overflow-hidden"
                                 >
-                                    <label className="text-[10px] font-bold ml-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Phone Number</label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                                        <input
-                                            type="tel"
-                                            value={phone}
-                                            onChange={(e) => setPhone(e.target.value)}
-                                            placeholder="+1 (555) 000-0000"
-                                            className="w-full rounded-xl px-9 py-2.5 text-xs focus:outline-none transition-all"
-                                            style={{
-                                                backgroundColor: 'var(--bg-secondary)',
-                                                border: '1px solid var(--border)',
-                                                color: 'var(--text-primary)'
-                                            }}
-                                            required
-                                        />
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold ml-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Full Name</label>
+                                        <div className="relative">
+                                            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                                            <input
+                                                type="text"
+                                                value={name}
+                                                onChange={(e) => setName(e.target.value)}
+                                                placeholder="John Doe"
+                                                className="w-full rounded-xl px-9 py-2.5 text-xs focus:outline-none transition-all"
+                                                style={{
+                                                    backgroundColor: 'var(--bg-secondary)',
+                                                    border: '1px solid var(--border)',
+                                                    color: 'var(--text-primary)'
+                                                }}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold ml-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Phone Number</label>
+                                        <div className="relative">
+                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                                            <input
+                                                type="tel"
+                                                value={phone}
+                                                onChange={(e) => setPhone(e.target.value)}
+                                                placeholder="+1 (555) 000-0000"
+                                                className="w-full rounded-xl px-9 py-2.5 text-xs focus:outline-none transition-all"
+                                                style={{
+                                                    backgroundColor: 'var(--bg-secondary)',
+                                                    border: '1px solid var(--border)',
+                                                    color: 'var(--text-primary)'
+                                                }}
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}
@@ -228,6 +249,24 @@ export default function LoginPage() {
                             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                             <span>{isLogin ? 'Sign In' : 'Sign Up'}</span>
                         </motion.button>
+
+                        <AnimatePresence>
+                            {authError && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, height: "auto", scale: 1 }}
+                                    exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                                    className="w-full rounded-xl px-4 py-2 mt-2 text-xs text-center border font-semibold flex items-center justify-center"
+                                    style={{
+                                        backgroundColor: authError.includes("created") ? 'var(--win-bg)' : 'var(--loss-bg)',
+                                        borderColor: authError.includes("created") ? 'var(--win-border)' : 'var(--loss-border)',
+                                        color: authError.includes("created") ? 'var(--win)' : 'var(--loss)',
+                                    }}
+                                >
+                                    {authError}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </motion.form>
 
                     <motion.div layout transition={{ duration: 0.4, ease: "easeInOut" }} className="relative w-full flex items-center mb-4">

@@ -3,7 +3,6 @@
 import React from 'react';
 import { BadgeCheck, TrendingUp, TrendingDown, Minus, Crosshair } from 'lucide-react';
 import { twMerge } from "tailwind-merge";
-import { toast } from 'sonner';
 
 interface ExecutionPanelProps {
     status?: 'awaiting' | 'analyzing' | 'completed';
@@ -22,11 +21,8 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
 
     const copyToClipboard = (text: string, label: string) => {
         if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-                toast.success(`${label} Copied`, { description: text });
-            }).catch(err => {
+            navigator.clipboard.writeText(text).catch(err => {
                 console.error('Failed to copy: ', err);
-                toast.error('Failed to copy to clipboard');
             });
         } else {
             let textArea = document.createElement("textarea");
@@ -39,10 +35,8 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
             textArea.select();
             try {
                 document.execCommand('copy');
-                toast.success(`${label} Copied`, { description: text });
             } catch (err) {
                 console.error('Fallback: Oops, unable to copy', err);
-                toast.error('Failed to copy to clipboard');
             }
             document.body.removeChild(textArea);
         }

@@ -1,5 +1,43 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import sharp from 'sharp';
+
+/**
+ * Normalizes a chart image for AI analysis.
+ * If the image is portrait-oriented (height > width — typical of mobile screenshots),
+ * it is rotated 90° clockwise to convert it to landscape so the AI can correctly
+ * read chart structure, trend lines, and price action.
+ */
+async function normalizeChartOrientation(file: File): Promise<{ buffer: Buffer; filename: string; mimetype: string }> {
+    const arrayBuffer = await file.arrayBuffer();
+    const inputBuffer = Buffer.from(arrayBuffer);
+
+    const image = sharp(inputBuffer);
+    const metadata = await image.metadata();
+
+    const width = metadata.width ?? 0;
+    const height = metadata.height ?? 0;
+
+    console.log(`[ImageNorm] ${file.name}: ${width}x${height} (${width < height ? 'PORTRAIT → rotating to landscape' : 'landscape, no change'})`);
+
+    let outputBuffer: Buffer;
+    if (height > width) {
+        // Portrait (mobile) chart detected — rotate 90° clockwise to make it landscape
+        // so the AI can read horizontal price action and trend structure correctly
+        outputBuffer = await image
+            .rotate(90)
+            .toFormat('jpeg', { quality: 92 })
+            .toBuffer();
+    } else {
+        // Already landscape — pass through as-is (re-encode to ensure consistent format)
+        outputBuffer = await image
+            .toFormat('jpeg', { quality: 92 })
+            .toBuffer();
+    }
+
+    const filename = file.name.replace(/\.[^.]+$/, '') + '_normalized.jpg';
+    return { buffer: outputBuffer, filename, mimetype: 'image/jpeg' };
+}
 
 export async function POST(request: Request) {
     console.log("Analyze API hit");
@@ -16,10 +54,22 @@ export async function POST(request: Request) {
             );
         }
 
+        // --- AUTHENTICATE USER BEFORE DOING ANYTHING ---
+        const supabase = await createClient();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        console.log("Analyzing who is the user:", user?.id, "Error:", userError);
+
+        if (!user) {
+             return NextResponse.json({ error: 'Unauthorized: Please log in to analyze charts' }, { status: 401 });
+        }
+
         // Create a new FormData instance to forward to n8n
         const n8nFormData = new FormData();
+        
+        // Let N8n know who the user is, in case N8n has a Supabase insertion node as well
+        n8nFormData.append('user_id', user.id);
 
-        // Retrieve and append files from the incoming request
+        // Retrieve files from the incoming request
         const htf = formData.get('image_htf');
         const mid = formData.get('image_mid');
         const ltf = formData.get('image_ltf');
@@ -30,17 +80,30 @@ export async function POST(request: Request) {
             ltf: ltf instanceof File ? `File: ${ltf.name} (${ltf.size})` : 'Missing',
         });
 
-        // Helper to append safely
-        const appendFile = (key: string, file: FormDataEntryValue | null) => {
-            if (file && file instanceof File) {
-                // Ensure we pass the file with its name
+        /**
+         * Normalize each image orientation before forwarding to n8n.
+         * Portrait-mode mobile screenshots are rotated to landscape so the AI
+         * can properly perform technical analysis (trend, structure, S/R levels).
+         */
+        const normalizeAndAppend = async (key: string, file: FormDataEntryValue | null) => {
+            if (!file || !(file instanceof File)) return;
+            try {
+                const { buffer, filename, mimetype } = await normalizeChartOrientation(file);
+                // Convert Buffer to Uint8Array for Blob compatibility (TypeScript strict mode)
+                const normalizedBlob = new Blob([new Uint8Array(buffer)], { type: mimetype });
+                n8nFormData.append(key, normalizedBlob, filename);
+            } catch (err) {
+                // If normalization fails for any reason, fall back to the original file
+                console.warn(`[ImageNorm] Failed to normalize ${key}, using original:`, err);
                 n8nFormData.append(key, file, file.name);
             }
         };
 
-        appendFile('image_htf', htf);
-        appendFile('image_mid', mid);
-        appendFile('image_ltf', ltf);
+        await Promise.all([
+            normalizeAndAppend('image_htf', htf),
+            normalizeAndAppend('image_mid', mid),
+            normalizeAndAppend('image_ltf', ltf),
+        ]);
 
         console.log("Sending to N8N...");
 
@@ -107,12 +170,9 @@ export async function POST(request: Request) {
             // Normalize the data (handle array or single object)
             const result = Array.isArray(data) ? data[0] : data;
 
-            // Check user
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-
             // Only attempt to save if we have a valid signal and supabase client
             if (supabase && user && result && (result.signal || result.signal_type)) {
+                console.log("Next.js attempting to insert into Supabase as user:", user.id);
                 try {
                     const { error: dbError } = await supabase
                         .from('trading_signals')
@@ -120,10 +180,10 @@ export async function POST(request: Request) {
                             {
                                 user_id: user.id,
                                 asset_name: result.asset_name || result.asset || 'Unknown',
-                                signal_type: result.signal_type || result.signal || 'NEUTRAL',
-                                outcome: 'PENDING',
-                                stop_loss: result.stop_loss || 0,
-                                take_profit: result.take_profit || 0,
+                                signal_type: (result.signal_type || result.signal || 'WAIT').toUpperCase(),
+                                outcome: 'pending',
+                                stop_loss: result.stop_loss || result.sl || 0,
+                                take_profit: result.take_profit || result.tp || 0,
                                 reasoning: result.reasoning || "No reasoning provided",
                                 confidence: result.confidence || 0,
                                 setup_type: result.setup_type || 'Standard'

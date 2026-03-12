@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { AlertCircle, Inbox, Loader2, RotateCcw, ArrowUpRight, Trash2, TrendingUp, TrendingDown, Minus, ChevronDown, X, Check } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
-import { toast } from 'sonner';
 import { DeleteModal } from './modals/DeleteModal';
 
 interface SelectOption {
@@ -191,9 +190,8 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                 }
 
                 setTrades([]);
-                toast.success('All history deleted');
             } catch (error: any) {
-                toast.error('Delete all failed', { description: error.message });
+                console.error('Delete all failed', error);
             }
         } else if (type === 'single' && id) {
             setDeletingId(id);
@@ -208,10 +206,9 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                 }
 
                 setTrades(prev => prev.filter(t => t.id !== id));
-                toast.success('Record deleted');
                 if (onDelete) onDelete(id);
             } catch (error: any) {
-                toast.error('Delete failed', { description: error.message });
+                console.error('Delete failed', error);
             } finally {
                 setDeletingId(null);
             }

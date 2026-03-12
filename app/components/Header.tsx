@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
-import { LayoutDashboard, History, Sun, Moon, LogOut, Menu, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LayoutDashboard, History, Sun, Moon, LogOut, Menu, X, User } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { useTheme } from './ThemeProvider';
 import { createClient } from '@/lib/supabase/client';
@@ -17,6 +17,20 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
     const router = useRouter();
     const supabase = createClient();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [userData, setUserData] = useState<{ name: string; email: string } | null>(null);
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserData({
+                    name: user.user_metadata?.full_name || 'Trader',
+                    email: user.email || 'No email',
+                });
+            }
+        };
+        fetchUser();
+    }, [supabase.auth]);
 
     const handleLogout = async () => {
         // Clear user-specific session data from UI so they do not overlap
@@ -201,14 +215,21 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                             </button>
                         </div>
                         
-                        {/* Body / Spacing */}
+                        {/* Body / User Info */}
                         <div className="flex-1 overflow-y-auto p-5">
-                            <p className="text-xs font-semibold tracking-wide uppercase mb-3" style={{ color: 'var(--text-tertiary)' }}>
-                                Appearance & Account
-                            </p>
-                            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                                Manage your theme preferences or securely log out of your trading session below.
-                            </p>
+                            <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex items-center gap-3 border" style={{ borderColor: 'var(--border-light)' }}>
+                                <div className="w-10 h-10 rounded-full flex justify-center items-center shrink-0" style={{ backgroundColor: 'var(--nav-bg)', color: 'var(--text-secondary)' }}>
+                                    <User className="w-5 h-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                                        {userData?.name || 'Trader'}
+                                    </span>
+                                    <span className="text-[11px] font-semibold truncate opacity-70 mb-0.5" style={{ color: 'var(--text-secondary)' }}>
+                                        {userData?.email || 'No email'}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Sidebar Footer Actions */}

@@ -6,7 +6,6 @@ import { Header } from './components/Header';
 import { InputPanel, InputPanelFiles } from './components/InputPanel';
 import { ExecutionPanel } from './components/ExecutionPanel';
 import { HistoryTable } from './components/HistoryTable';
-import { toast, Toaster } from 'sonner';
 
 // Mock outcome type for demonstration
 interface AnalysisResult {
@@ -149,7 +148,6 @@ export default function Home() {
     const proxyUrl = '/api/analyze';
 
     try {
-      toast.info('Sending Multi-Timeframe Data to AI Engine...');
       const formData = new FormData();
 
       // Append files with specific keys matching n8n logic
@@ -172,7 +170,7 @@ export default function Home() {
         }
 
         setAnalysisResult({
-          signal: data.signal_type || data.signal || 'NEUTRAL',
+          signal: data.signal_type || data.signal || 'WAIT',
           sl: data.stop_loss || 0,
           tp: data.take_profit || 0,
           reasoning: data.reasoning || "No reasoning provided.",
@@ -182,7 +180,6 @@ export default function Home() {
 
         setStatus('completed');
         setHasAnalyzed(true);
-        toast.success('SMC Analysis Complete');
       } else {
         throw new Error("No data returned from analysis");
       }
@@ -195,13 +192,9 @@ export default function Home() {
       const errorMessage = errorData?.error || error.message || 'Unknown error occurred';
       const errorDetails = errorData?.details ? `Details: ${errorData.details}` : '';
 
-      toast.error('Analysis Failed', {
-        description: errorDetails ? `${errorMessage}\n${errorDetails}` : errorMessage
-      });
-
+      // Fallback or warning logic can be handled here if needed
       if (errorMessage.includes('N8N Webhook URL is not configured')) {
-        // Optional: Trigger simulation fallback if desired, or just warn user
-        toast.warning("Check your .env.local configuration.");
+        console.warn("Check your .env.local configuration.");
       }
     } finally {
       setIsProcessing(false);
@@ -213,9 +206,6 @@ export default function Home() {
 
       {/* Header */}
       <Header activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {/* Toaster for notifications */}
-      <Toaster position="top-right" richColors />
 
       {/* Main Content Area */}
       <div className="flex-1 p-4 md:p-6 overflow-y-auto lg:overflow-hidden">
@@ -261,7 +251,6 @@ export default function Home() {
                   asset: trade.asset
                 });
                 setActiveTab('analysis');
-                toast.success('Loaded analysis from history');
               }}
               onDelete={async (id) => {
                 // Optimistic update handled in component, or refresh here if needed
