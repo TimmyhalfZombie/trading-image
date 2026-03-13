@@ -15,7 +15,7 @@ export async function updateSession(request: NextRequest) {
                     return request.cookies.getAll();
                 },
                 setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
                     supabaseResponse = NextResponse.next({
                         request,
                     });
@@ -27,21 +27,36 @@ export async function updateSession(request: NextRequest) {
         }
     );
 
+    // IMPORTANT: Do not add any code between createServerClient and getUser().
     const {
         data: { user },
+        error: userError,
     } = await supabase.auth.getUser();
 
-    // Handling unauthenticated access
-    if (!user && request.nextUrl.pathname !== '/login' && !request.nextUrl.pathname.startsWith('/api/analyze')) {
-        // If it's an API request, return 401 Unauthorized instead of redirecting to HTML login page
+    // If refresh token is invalid/expired, clear stale auth cookies so the
+    // user isn't permanently locked out with a bad session.
+    if (userError && userError.status === 400) {
+        const clearResponse = NextResponse.redirect(new URL('/login', request.url));
+        // Wipe all sb-* (Supabase) auth cookies
+        request.cookies.getAll()
+            .filter(c => c.name.startsWith('sb-'))
+            .forEach(c => clearResponse.cookies.delete(c.name));
+        return clearResponse;
+    }
+
+    if (
+        !user &&
+        !request.nextUrl.pathname.startsWith('/login') &&
+        !request.nextUrl.pathname.startsWith('/auth')  // covers /auth/callback OAuth redirect
+    ) {
+        // For API routes: return 401 JSON so the client can handle it gracefully
         if (request.nextUrl.pathname.startsWith('/api/')) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-
-        // Otherwise, redirect to login page
-        const url = request.nextUrl.clone()
-        url.pathname = '/login'
-        return NextResponse.redirect(url)
+        // For page routes: redirect to login
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        return NextResponse.redirect(url);
     }
 
     return supabaseResponse;

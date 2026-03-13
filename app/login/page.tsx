@@ -69,6 +69,7 @@ export default function LoginPage() {
 
     const handleGoogleLogin = async () => {
         setIsLoading(true);
+        setAuthError(null);
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -80,22 +81,23 @@ export default function LoginPage() {
             if (error) throw error;
         } catch (error: any) {
             console.error("Failed to login", error);
+            setAuthError(error.message || "Google Sign-In is not configured yet.");
             setIsLoading(false);
         }
     };
 
     return (
-        <main className="min-h-screen grid items-center justify-items-center p-4 sm:p-6 overflow-hidden relative" style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
+        <main className="fixed inset-0 w-full h-[100dvh] flex items-center justify-center p-3 sm:p-6 overflow-hidden overscroll-none" style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
             {/* Decorative Blur Elements - Pinned beneath scrolling content */}
             <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-1)' }}></div>
             <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-2)' }}></div>
 
-            <div className="w-full max-w-sm relative z-10 py-10 my-auto">
+            <div className="w-full max-w-sm relative z-10 flex flex-col justify-center h-full">
                 <MotionConfig transition={{ duration: 0.4, ease: "easeInOut" }}>
                     <motion.div
                         layout
                         transition={{ duration: 0.4, ease: "easeInOut" }}
-                        className="w-full max-w-sm p-5 sm:p-7 rounded-3xl backdrop-blur-md shadow-2xl flex flex-col items-center border transition-colors duration-300 overflow-hidden"
+                        className="w-full max-w-sm p-5 sm:p-7 rounded-3xl backdrop-blur-md shadow-2xl flex flex-col items-center border transition-colors duration-300"
                         style={{ backgroundColor: 'var(--surface-alt)', border: '1px solid var(--border)' }}
                     >
                     <div className="relative w-10 h-10 flex items-center justify-center mb-3">
@@ -106,16 +108,16 @@ export default function LoginPage() {
                         </svg>
                     </div>
 
-                    <h1 className="text-2xl font-black tracking-tight mb-1" style={{ color: 'var(--text-primary)' }}>
+                    <h1 className="text-xl md:text-2xl font-black tracking-tight mb-1" style={{ color: 'var(--text-primary)' }}>
                         {isLogin ? 'Welcome back' : 'Create an Account'}
                     </h1>
-                    <p className="text-xs mb-4 text-center font-medium leading-tight" style={{ color: 'var(--text-secondary)' }}>
+                    <p className="text-[10px] md:text-xs mb-3 text-center font-medium leading-tight" style={{ color: 'var(--text-secondary)' }}>
                         {isLogin
                             ? 'Smart Trading analysis awaits. Please sign in.'
                             : 'Sign up to start tracking your trading history securely.'}
                     </p>
 
-                    <motion.form layout transition={{ duration: 0.4, ease: "easeInOut" }} onSubmit={handleAuth} className="w-full flex flex-col gap-3 mb-4">
+                    <motion.form layout transition={{ duration: 0.4, ease: "easeInOut" }} onSubmit={handleAuth} className="w-full flex flex-col gap-2 mb-3">
                         <div className="flex flex-col gap-1">
                             <label className="text-[10px] font-bold ml-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Email</label>
                             <div className="relative">
@@ -143,7 +145,7 @@ export default function LoginPage() {
                                     initial={{ opacity: 0, height: 0, scale: 0.95, margin: 0 }}
                                     animate={{ opacity: 1, height: "auto", scale: 1, marginTop: 4, marginBottom: 4 }}
                                     exit={{ opacity: 0, height: 0, scale: 0.95, margin: 0 }}
-                                    className="flex flex-col gap-3 overflow-hidden"
+                                    className="flex flex-col gap-2 overflow-hidden"
                                 >
                                     <div className="flex flex-col gap-1">
                                         <label className="text-[10px] font-bold ml-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Full Name</label>
@@ -269,19 +271,19 @@ export default function LoginPage() {
                         </AnimatePresence>
                     </motion.form>
 
-                    <motion.div layout transition={{ duration: 0.4, ease: "easeInOut" }} className="relative w-full flex items-center mb-4">
-                        <div className="flex-1 border-t" style={{ borderColor: 'var(--border)' }}></div>
-                        <span className="px-3 text-[9px] font-bold tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>OR</span>
-                        <div className="flex-1 border-t" style={{ borderColor: 'var(--border)' }}></div>
-                    </motion.div>
+                        <motion.div layout transition={{ duration: 0.4, ease: "easeInOut" }} className="relative w-full flex items-center mb-3">
+                            <div className="flex-1 border-t" style={{ borderColor: 'var(--border)' }}></div>
+                            <span className="px-3 text-[9px] font-bold tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>OR</span>
+                            <div className="flex-1 border-t" style={{ borderColor: 'var(--border)' }}></div>
+                        </motion.div>
 
-                    <motion.button
-                        layout
-                        transition={{ duration: 0.4, ease: "easeInOut" }}
-                        onClick={handleGoogleLogin}
-                        disabled={isLoading}
-                        type="button"
-                        className="w-full relative flex items-center justify-center gap-2 px-6 py-2.5 mb-5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:opacity-80"
+                        <motion.button
+                            layout
+                            transition={{ duration: 0.4, ease: "easeInOut" }}
+                            onClick={handleGoogleLogin}
+                            disabled={isLoading}
+                            type="button"
+                            className="w-full relative flex items-center justify-center gap-2 px-6 py-2.5 mb-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:opacity-80"
                         style={{
                             backgroundColor: 'var(--nav-bg)',
                             border: '1px solid var(--border-light)',
