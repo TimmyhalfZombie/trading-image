@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 type Theme = 'light' | 'dark';
 
@@ -40,7 +41,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }, [theme, mounted]);
 
     const toggleTheme = () => {
-        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+        const newTheme = theme === 'light' ? 'dark' : 'light';
+        
+        // Prevent all CSS transitions globally during Theme switch to avoid massive layout/paint lag on mobile
+        const css = document.createElement('style');
+        css.appendChild(document.createTextNode('* { -webkit-transition: none !important; transition: none !important; }'));
+        document.head.appendChild(css);
+        
+        const removeCss = () => {
+            // Force a reflow to ensure the disabled state is applied before putting transitions back
+            const _ = window.getComputedStyle(css).opacity;
+            if (document.head.contains(css)) document.head.removeChild(css);
+        };
+
+        if (!document.startViewTransition) {
+            setTheme(newTheme);
+            requestAnimationFrame(() => requestAnimationFrame(removeCss));
+            return;
+        }
+
+        document.startViewTransition(() => {
+            flushSync(() => {
+                setTheme(newTheme);
+            });
+        }).finished.finally(removeCss);
     };
 
     // Prevent flash of wrong theme

@@ -215,7 +215,7 @@ export default function Home() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 p-4 md:p-6 overflow-y-auto lg:overflow-hidden">
+      <div className="flex-1 p-4 md:p-6 overflow-hidden">
 
         {activeTab === 'analysis' ? (
           <div className="flex flex-col lg:flex-row gap-6 h-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
@@ -247,7 +247,7 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="lg:h-full min-h-[600px] max-w-[1200px] mx-auto w-full animate-in fade-in duration-500">
+          <div className="h-full max-w-[1200px] mx-auto w-full animate-in fade-in duration-500">
             <HistoryTable
               onView={(trade) => {
                 setAnalysisResult({
