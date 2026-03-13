@@ -35,7 +35,13 @@ export async function updateSession(request: NextRequest) {
 
     // If refresh token is invalid/expired, clear stale auth cookies so the
     // user isn't permanently locked out with a bad session.
-    if (userError && userError.status === 400) {
+    // IMPORTANT: exclude /login and /auth to prevent infinite redirect loops.
+    if (
+        userError &&
+        userError.status === 400 &&
+        !request.nextUrl.pathname.startsWith('/login') &&
+        !request.nextUrl.pathname.startsWith('/auth')
+    ) {
         const clearResponse = NextResponse.redirect(new URL('/login', request.url));
         // Wipe all sb-* (Supabase) auth cookies
         request.cookies.getAll()
