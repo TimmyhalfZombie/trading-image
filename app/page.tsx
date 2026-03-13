@@ -19,6 +19,7 @@ interface AnalysisResult {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'analysis' | 'history'>('analysis');
+  const [mobilePanelView, setMobilePanelView] = useState<'upload' | 'result'>('upload');
   const executionPanelRef = React.useRef<HTMLDivElement>(null);
 
   // State for file upload / processing
@@ -44,6 +45,7 @@ export default function Home() {
         setAnalysisResult(parsed);
         setStatus('completed');
         setHasAnalyzed(true);
+        setMobilePanelView('result');
       } catch (e) {
         console.error("Failed to recover analysis state", e);
       }
@@ -180,6 +182,7 @@ export default function Home() {
 
         setStatus('completed');
         setHasAnalyzed(true);
+        setMobilePanelView('result');
       } else {
         throw new Error("No data returned from analysis");
       }
@@ -190,7 +193,6 @@ export default function Home() {
 
       const errorData = error.response?.data;
       const errorMessage = errorData?.error || error.message || 'Unknown error occurred';
-      const errorDetails = errorData?.details ? `Details: ${errorData.details}` : '';
 
       // Fallback or warning logic can be handled here if needed
       if (errorMessage.includes('N8N Webhook URL is not configured')) {
@@ -205,15 +207,20 @@ export default function Home() {
     <main className="flex flex-col h-[100dvh] w-full overflow-hidden font-sans selection:bg-amber-100 selection:text-amber-900 transition-colors duration-300 relative" style={{ backgroundColor: 'var(--bg)' }}>
 
       {/* Header */}
-      <Header activeTab={activeTab} onTabChange={setActiveTab} />
+      <Header 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        mobilePanelView={mobilePanelView}
+        onMobilePanelChange={setMobilePanelView}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 p-4 md:p-6 overflow-y-auto lg:overflow-hidden">
 
         {activeTab === 'analysis' ? (
-          <div className="flex flex-col lg:flex-row gap-6 lg:h-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
+          <div className="flex flex-col lg:flex-row gap-6 h-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
             {/* Left Panel: Input Source */}
-            <div className="w-full lg:w-[400px] flex-shrink-0 lg:h-full h-[600px] sm:h-[550px] lg:h-auto">
+            <div className={`w-full lg:w-[400px] flex-shrink-0 h-full ${mobilePanelView === 'upload' ? 'block' : 'hidden lg:block'}`}>
               {/* @ts-ignore - Temporary until InputPanel types are reloaded */}
               <InputPanel
                 files={files}
@@ -226,6 +233,7 @@ export default function Home() {
                   setStatus('awaiting');
                   localStorage.removeItem('hive_analysis_result');
                   setHasAnalyzed(false);
+                  setMobilePanelView('upload');
                 }}
                 onAnalyze={handleAnalysis}
                 isLoading={isProcessing}
@@ -234,7 +242,7 @@ export default function Home() {
             </div>
 
             {/* Right Panel: AI Execution Engine */}
-            <div ref={executionPanelRef} className={`flex-1 h-[600px] lg:h-full ${status === 'awaiting' ? 'hidden lg:block' : 'block'}`}>
+            <div ref={executionPanelRef} className={`flex-1 w-full h-[500px] sm:h-[600px] lg:h-full ${mobilePanelView === 'result' ? 'block' : 'hidden lg:block'}`}>
               <ExecutionPanel status={status} result={analysisResult} />
             </div>
           </div>
@@ -251,6 +259,7 @@ export default function Home() {
                   asset: trade.asset
                 });
                 setActiveTab('analysis');
+                setMobilePanelView('result');
               }}
               onDelete={async (id) => {
                 // Optimistic update handled in component, or refresh here if needed

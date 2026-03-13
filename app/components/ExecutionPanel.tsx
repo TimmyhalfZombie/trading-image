@@ -72,9 +72,9 @@ export function ExecutionPanel({ status = 'awaiting', result }: ExecutionPanelPr
                 )}
             </div>
 
-            <div className="flex-1 p-6 relative min-h-0">
+            <div className="flex-1 p-6 relative min-h-0 flex flex-col">
                 {!isAnalyzed ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center opacity-30 select-none pointer-events-none p-12">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center opacity-30 select-none pointer-events-none min-h-[300px] py-12">
                         <div
                             className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
                             style={{

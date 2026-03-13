@@ -158,7 +158,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
             >
                 <div>
                     <h2 className="text-sm font-bold tracking-wide uppercase" style={{ color: 'var(--text-primary)' }}>Chart Input</h2>
-                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Upload multi-timeframe screenshots</p>
+                    <p className="text-[11px] mt-0.5 hidden md:block" style={{ color: 'var(--text-tertiary)' }}>Upload multi-timeframe screenshots</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {isLoading && (
@@ -192,7 +192,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                 </div>
             </div>
 
-            <div className="flex-1 p-3 md:p-5 flex flex-col md:flex-row lg:flex-col gap-2 md:gap-3 overflow-y-auto lg:overflow-hidden">
+            <div className="flex-1 p-3 md:p-5 flex flex-col md:flex-row lg:flex-col gap-2 md:gap-3 overflow-hidden">
                 <SingleDropzone
                     label="Higher Timeframe"
                     subLabel="4H Chart"

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, History, Sun, Moon, LogOut, Menu, X, User } from 'lucide-react';
+import { LayoutDashboard, History, Sun, Moon, LogOut, Menu, X, User, Upload, Zap } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { useTheme } from './ThemeProvider';
 import { createClient } from '@/lib/supabase/client';
@@ -10,9 +10,11 @@ import { useRouter } from 'next/navigation';
 interface HeaderProps {
     activeTab: 'analysis' | 'history';
     onTabChange: (tab: 'analysis' | 'history') => void;
+    mobilePanelView: 'upload' | 'result';
+    onMobilePanelChange: (view: 'upload' | 'result') => void;
 }
 
-export function Header({ activeTab, onTabChange }: HeaderProps) {
+export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelChange }: HeaderProps) {
     const { theme, toggleTheme } = useTheme();
     const router = useRouter();
     const supabase = createClient();
@@ -203,32 +205,76 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
                         className="w-[280px] h-full shadow-2xl relative flex flex-col transition-transform duration-300 animate-in slide-in-from-right"
                         style={{ backgroundColor: 'var(--surface)' }}
                     >
-                        {/* Sidebar Header */}
+                        {/* Sidebar Header with User Data */}
                         <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: 'var(--border-light)' }}>
-                            <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--text-primary)' }}>Menu</span>
+                            <div className="flex flex-col min-w-0 pr-2">
+                                <span className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                                    {userData?.name || 'Trader'}
+                                </span>
+                                <span className="text-[11px] font-semibold truncate opacity-70" style={{ color: 'var(--text-secondary)' }}>
+                                    {userData?.email || 'No email'}
+                                </span>
+                            </div>
                             <button
                                 onClick={() => setIsSidebarOpen(false)}
-                                className="p-2 rounded-full cursor-pointer transition-colors"
+                                className="p-2 rounded-full cursor-pointer transition-colors flex-shrink-0"
                                 style={{ color: 'var(--text-secondary)' }}
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
                         
-                        {/* Body / User Info */}
+                        {/* Body / Panel Controls */}
                         <div className="flex-1 overflow-y-auto p-5">
-                            <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex items-center gap-3 border" style={{ borderColor: 'var(--border-light)' }}>
-                                <div className="w-10 h-10 rounded-full flex justify-center items-center shrink-0" style={{ backgroundColor: 'var(--nav-bg)', color: 'var(--text-secondary)' }}>
-                                    <User className="w-5 h-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                    <span className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-                                        {userData?.name || 'Trader'}
-                                    </span>
-                                    <span className="text-[11px] font-semibold truncate opacity-70 mb-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                        {userData?.email || 'No email'}
-                                    </span>
-                                </div>
+                            <p className="text-[10px] uppercase font-bold tracking-wider mb-3 opacity-60" style={{ color: 'var(--text-secondary)' }}>
+                                Panel View
+                            </p>
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={() => {
+                                        onTabChange('analysis');
+                                        onMobilePanelChange('upload');
+                                        setIsSidebarOpen(false);
+                                    }}
+                                    className={twMerge(
+                                        "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all duration-200 cursor-pointer",
+                                    )}
+                                    style={mobilePanelView === 'upload' && activeTab === 'analysis' ? {
+                                        backgroundColor: 'var(--nav-active-bg)',
+                                        color: 'var(--nav-active-text)',
+                                        boxShadow: `0 0 0 1px var(--nav-active-ring)`,
+                                    } : {
+                                        backgroundColor: 'var(--nav-bg)',
+                                        color: 'var(--text-secondary)',
+                                        border: '1px solid var(--border-light)'
+                                    }}
+                                >
+                                    <Upload className="w-4 h-4" />
+                                    Upload Details
+                                </button>
+                                
+                                <button
+                                    onClick={() => {
+                                        onTabChange('analysis');
+                                        onMobilePanelChange('result');
+                                        setIsSidebarOpen(false);
+                                    }}
+                                    className={twMerge(
+                                        "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all duration-200 cursor-pointer",
+                                    )}
+                                    style={mobilePanelView === 'result' && activeTab === 'analysis' ? {
+                                        backgroundColor: 'var(--nav-active-bg)',
+                                        color: 'var(--nav-active-text)',
+                                        boxShadow: `0 0 0 1px var(--nav-active-ring)`,
+                                    } : {
+                                        backgroundColor: 'var(--nav-bg)',
+                                        color: 'var(--text-secondary)',
+                                        border: '1px solid var(--border-light)'
+                                    }}
+                                >
+                                    <Zap className="w-4 h-4" />
+                                    AI Result Data
+                                </button>
                             </div>
                         </div>
 
