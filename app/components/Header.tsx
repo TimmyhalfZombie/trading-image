@@ -94,8 +94,9 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* Desktop Navigation */}
                     <nav
-                        className="flex items-center rounded-full p-1 transition-colors duration-300"
+                        className="hidden md:flex items-center rounded-full p-1 transition-colors duration-300"
                         style={{
                             backgroundColor: 'var(--nav-bg)',
                             border: '1px solid var(--border-light)',
@@ -104,40 +105,76 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                         <button
                             onClick={() => onTabChange('analysis')}
                             className={twMerge(
-                                "px-3 md:px-5 py-2 rounded-full text-[10px] md:text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 md:gap-2 tracking-wide cursor-pointer",
-                                activeTab === 'analysis'
-                                    ? "shadow-sm"
-                                    : "hover:opacity-80"
+                                "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide cursor-pointer",
+                                activeTab === 'analysis' ? "shadow-sm" : "hover:opacity-80"
                             )}
                             style={activeTab === 'analysis' ? {
                                 backgroundColor: 'var(--nav-active-bg)',
                                 color: 'var(--nav-active-text)',
                                 boxShadow: `0 0 0 1px var(--nav-active-ring)`,
-                            } : {
-                                color: 'var(--text-tertiary)',
-                            }}
+                            } : { color: 'var(--text-tertiary)' }}
                         >
-                            <LayoutDashboard className="w-3.5 h-3.5 hidden sm:block" />
+                            <LayoutDashboard className="w-3.5 h-3.5" />
                             Analysis
                         </button>
                         <button
                             onClick={() => onTabChange('history')}
                             className={twMerge(
-                                "px-3 md:px-5 py-2 rounded-full text-[10px] md:text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 md:gap-2 tracking-wide cursor-pointer",
-                                activeTab === 'history'
-                                    ? "shadow-sm"
-                                    : "hover:opacity-80"
+                                "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide cursor-pointer",
+                                activeTab === 'history' ? "shadow-sm" : "hover:opacity-80"
                             )}
                             style={activeTab === 'history' ? {
                                 backgroundColor: 'var(--nav-active-bg)',
                                 color: 'var(--nav-active-text)',
                                 boxShadow: `0 0 0 1px var(--nav-active-ring)`,
-                            } : {
-                                color: 'var(--text-tertiary)',
-                            }}
+                            } : { color: 'var(--text-tertiary)' }}
                         >
-                            <History className="w-3.5 h-3.5 hidden sm:block" />
+                            <History className="w-3.5 h-3.5" />
                             History
+                        </button>
+                    </nav>
+
+                    {/* Mobile Navigation (Upload / Result) */}
+                    <nav
+                        className="flex md:hidden items-center rounded-full p-1 transition-colors duration-300"
+                        style={{
+                            backgroundColor: 'var(--nav-bg)',
+                            border: '1px solid var(--border-light)',
+                        }}
+                    >
+                        <button
+                            onClick={() => {
+                                onTabChange('analysis');
+                                onMobilePanelChange('upload');
+                            }}
+                            className={twMerge(
+                                "px-4 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 flex items-center justify-center tracking-wide cursor-pointer min-w-[70px]",
+                                mobilePanelView === 'upload' && activeTab === 'analysis' ? "shadow-sm" : "hover:opacity-80"
+                            )}
+                            style={mobilePanelView === 'upload' && activeTab === 'analysis' ? {
+                                backgroundColor: 'var(--nav-active-bg)',
+                                color: 'var(--nav-active-text)',
+                                boxShadow: `0 0 0 1px var(--nav-active-ring)`,
+                            } : { color: 'var(--text-tertiary)' }}
+                        >
+                            Analysis
+                        </button>
+                        <button
+                            onClick={() => {
+                                onTabChange('analysis');
+                                onMobilePanelChange('result');
+                            }}
+                            className={twMerge(
+                                "px-4 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 flex items-center justify-center tracking-wide cursor-pointer min-w-[70px]",
+                                mobilePanelView === 'result' && activeTab === 'analysis' ? "shadow-sm" : "hover:opacity-80"
+                            )}
+                            style={mobilePanelView === 'result' && activeTab === 'analysis' ? {
+                                backgroundColor: 'var(--nav-active-bg)',
+                                color: 'var(--nav-active-text)',
+                                boxShadow: `0 0 0 1px var(--nav-active-ring)`,
+                            } : { color: 'var(--text-tertiary)' }}
+                        >
+                            Result
                         </button>
                     </nav>
 
@@ -224,22 +261,21 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                             </button>
                         </div>
                         
-                        {/* Body / Panel Controls */}
+                        {/* Body / App Navigation Controls */}
                         <div className="flex-1 overflow-y-auto p-5">
                             <p className="text-[10px] uppercase font-bold tracking-wider mb-3 opacity-60" style={{ color: 'var(--text-secondary)' }}>
-                                Panel View
+                                Navigation
                             </p>
                             <div className="flex flex-col gap-2">
                                 <button
                                     onClick={() => {
-                                        onTabChange('analysis');
-                                        onMobilePanelChange('upload');
+                                        onTabChange('history');
                                         setIsSidebarOpen(false);
                                     }}
                                     className={twMerge(
                                         "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all duration-200 cursor-pointer",
                                     )}
-                                    style={mobilePanelView === 'upload' && activeTab === 'analysis' ? {
+                                    style={activeTab === 'history' ? {
                                         backgroundColor: 'var(--nav-active-bg)',
                                         color: 'var(--nav-active-text)',
                                         boxShadow: `0 0 0 1px var(--nav-active-ring)`,
@@ -249,31 +285,8 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                                         border: '1px solid var(--border-light)'
                                     }}
                                 >
-                                    <Upload className="w-4 h-4" />
-                                    Upload Details
-                                </button>
-                                
-                                <button
-                                    onClick={() => {
-                                        onTabChange('analysis');
-                                        onMobilePanelChange('result');
-                                        setIsSidebarOpen(false);
-                                    }}
-                                    className={twMerge(
-                                        "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all duration-200 cursor-pointer",
-                                    )}
-                                    style={mobilePanelView === 'result' && activeTab === 'analysis' ? {
-                                        backgroundColor: 'var(--nav-active-bg)',
-                                        color: 'var(--nav-active-text)',
-                                        boxShadow: `0 0 0 1px var(--nav-active-ring)`,
-                                    } : {
-                                        backgroundColor: 'var(--nav-bg)',
-                                        color: 'var(--text-secondary)',
-                                        border: '1px solid var(--border-light)'
-                                    }}
-                                >
-                                    <Zap className="w-4 h-4" />
-                                    AI Result Data
+                                    <History className="w-4 h-4" />
+                                    History
                                 </button>
                             </div>
                         </div>
