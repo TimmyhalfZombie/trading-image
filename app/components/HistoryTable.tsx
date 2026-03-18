@@ -479,8 +479,15 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                                     return (
                                         <tr
                                             key={trade.id}
-                                            className="group transition-colors duration-200"
+                                            className="group transition-colors duration-200 hover:bg-black/5 dark:hover:bg-white/5"
                                             style={{ borderBottom: '1px solid var(--border-light)' }}
+                                            onMouseEnter={() => {
+                                                if (typeof window !== 'undefined') {
+                                                    if (trade.chart_htf_url) new window.Image().src = trade.chart_htf_url;
+                                                    if (trade.chart_mid_url) new window.Image().src = trade.chart_mid_url;
+                                                    if (trade.chart_ltf_url) new window.Image().src = trade.chart_ltf_url;
+                                                }
+                                            }}
                                         >
                                             {/* Date */}
                                             <td className="px-6 py-5 text-xs font-medium whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>

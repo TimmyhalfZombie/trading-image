@@ -258,9 +258,13 @@ export default function Home() {
 
             {/* Left Panel: Chart Input */}
             <div className={`w-full lg:w-[400px] flex-shrink-0 h-full ${mobilePanelView === 'upload' ? 'block' : 'hidden lg:block'}`}>
-              {/* @ts-ignore */}
               <InputPanel
                 files={files}
+                chartUrls={{
+                  htf: analysisResult?.chartHtfUrl,
+                  mid: analysisResult?.chartMidUrl,
+                  ltf: analysisResult?.chartLtfUrl,
+                }}
                 onFilesChange={(newFiles: InputPanelFiles) => {
                   setFiles(newFiles);
                   setHasAnalyzed(false);

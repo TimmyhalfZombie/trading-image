@@ -11,6 +11,12 @@ export interface InputPanelFiles {
     ltf: File | null;
 }
 
+export interface ChartUrls {
+    htf?: string | null;
+    mid?: string | null;
+    ltf?: string | null;
+}
+
 interface InputPanelProps {
     files: InputPanelFiles;
     onFilesChange: (files: InputPanelFiles) => void;
@@ -18,6 +24,7 @@ interface InputPanelProps {
     onClearAll?: () => void;
     isLoading?: boolean;
     hasAnalyzed?: boolean;
+    chartUrls?: ChartUrls;
 }
 
 interface SingleDropzoneProps {
@@ -28,9 +35,10 @@ interface SingleDropzoneProps {
     onRemove: () => void;
     disabled?: boolean;
     className?: string;
+    previewUrl?: string | null;
 }
 
-function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, className }: SingleDropzoneProps) {
+function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, className, previewUrl }: SingleDropzoneProps) {
     const [preview, setPreview] = useState<string | null>(null);
 
     React.useEffect(() => {
@@ -42,6 +50,10 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
             setPreview(null);
         }
     }, [file]);
+
+    // Use previewUrl from history when no file is uploaded
+    const displayUrl = preview || previewUrl || null;
+    const isHistoryPreview = !file && !!previewUrl;
 
     const onDropCallback = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
@@ -58,7 +70,7 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
 
     return (
         <div className={twMerge("w-full relative transition-all", className)}>
-            {file && preview ? (
+            {displayUrl ? (
                 <div
                     className="relative w-full h-full rounded-xl overflow-hidden group"
                     style={{
@@ -66,18 +78,26 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
                         border: '1px solid var(--border)',
                     }}
                 >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                        src={preview}
+                        src={displayUrl}
                         alt={label}
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500"
+                        className={twMerge(
+                            "w-full h-full object-cover",
+                            isHistoryPreview
+                                ? "opacity-100" // No CSS delay/opacity dims for history images
+                                : "opacity-80 group-hover:opacity-100 transition-opacity duration-500" // Smooth hover for uploads
+                        )}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
                     <div className="absolute inset-x-0 bottom-0 p-3 flex items-end justify-between">
                         <div className="min-w-0">
                             <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-0.5">{label}</p>
-                            <p className="text-xs text-white/80 truncate font-medium">{file.name}</p>
+                            <p className="text-xs text-white/80 truncate font-medium">
+                                {isHistoryPreview ? 'From history' : file?.name}
+                            </p>
                         </div>
-                        {!disabled && (
+                        {!disabled && !isHistoryPreview && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onRemove(); }}
                                 className="p-1.5 bg-white/10 hover:bg-red-500/80 backdrop-blur-md rounded-lg text-white transition-all"
@@ -129,9 +149,10 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
     );
 }
 
-export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoading = false, hasAnalyzed = false }: InputPanelProps) {
+export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoading = false, hasAnalyzed = false, chartUrls }: InputPanelProps) {
     const isReady = files.htf && files.mid && files.ltf;
     const hasAnyFile = files.htf || files.mid || files.ltf;
+    const hasAnyChartUrl = chartUrls?.htf || chartUrls?.mid || chartUrls?.ltf;
     const canAnalyze = isReady && !isLoading;
 
     const handleAnalyze = () => {
@@ -166,7 +187,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                             <Loader2 className="w-3 h-3 animate-spin" /> Processing
                         </span>
                     )}
-                    {hasAnyFile && !isLoading && (
+                    {(hasAnyFile || !!hasAnyChartUrl) && !isLoading && (
                         <button
                             onClick={() => {
                                 onFilesChange({ htf: null, mid: null, ltf: null });
@@ -201,6 +222,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                     onRemove={() => onFilesChange({ ...files, htf: null })}
                     disabled={isLoading}
                     className="flex-1 min-h-[110px] md:min-h-0"
+                    previewUrl={chartUrls?.htf}
                 />
 
                 <SingleDropzone
@@ -211,6 +233,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                     onRemove={() => onFilesChange({ ...files, mid: null })}
                     disabled={isLoading}
                     className="flex-1 min-h-[110px] md:min-h-0"
+                    previewUrl={chartUrls?.mid}
                 />
 
                 <SingleDropzone
@@ -221,6 +244,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                     onRemove={() => onFilesChange({ ...files, ltf: null })}
                     disabled={isLoading}
                     className="flex-1 min-h-[110px] md:min-h-0"
+                    previewUrl={chartUrls?.ltf}
                 />
             </div>
 
