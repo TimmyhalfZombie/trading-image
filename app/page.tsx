@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useToast } from './components/Toast';
+import { type Trade } from './components/HistoryTable';
 import axios from 'axios';
 import { Header } from './components/Header';
 import { InputPanel, InputPanelFiles } from './components/InputPanel';
 import { ExecutionPanel } from './components/ExecutionPanel';
 import { HistoryTable } from './components/HistoryTable';
 
-// Mock outcome type for demonstration
 interface AnalysisResult {
   signal: 'BUY' | 'SELL' | 'WAIT' | 'NEUTRAL';
   sl: number;
@@ -15,29 +16,28 @@ interface AnalysisResult {
   reasoning: string;
   confidence: number;
   asset: string;
+  chartHtfUrl?: string | null;
+  chartMidUrl?: string | null;
+  chartLtfUrl?: string | null;
 }
 
 export default function Home() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'analysis' | 'history'>('analysis');
   const [mobilePanelView, setMobilePanelView] = useState<'upload' | 'result'>('upload');
   const executionPanelRef = React.useRef<HTMLDivElement>(null);
 
-  // State for file upload / processing
   const [isProcessing, setIsProcessing] = useState(false);
-  const [files, setFiles] = useState<InputPanelFiles>({
-    htf: null,
-    mid: null,
-    ltf: null
-  });
+  const [files, setFiles] = useState<InputPanelFiles>({ htf: null, mid: null, ltf: null });
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | undefined>(undefined);
   const [status, setStatus] = useState<'awaiting' | 'analyzing' | 'completed'>('awaiting');
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
-  // Load state from local storage on mount
+  // ── Restore from localStorage on mount ──────────────────────────────────
   React.useEffect(() => {
     const savedResult = localStorage.getItem('hive_analysis_result');
-    const savedTab = localStorage.getItem('hive_active_tab');
-    const savedFiles = localStorage.getItem('hive_input_files');
+    const savedTab    = localStorage.getItem('hive_active_tab');
+    const savedFiles  = localStorage.getItem('hive_input_files');
 
     if (savedResult) {
       try {
@@ -47,7 +47,8 @@ export default function Home() {
         setHasAnalyzed(true);
         setMobilePanelView('result');
       } catch (e) {
-        console.error("Failed to recover analysis state", e);
+        console.error('Failed to recover analysis state', e);
+        toast.warning('Could not restore your last analysis session.', 'Session Restore Failed');
       }
     }
 
@@ -55,161 +56,196 @@ export default function Home() {
       try {
         const parsed = JSON.parse(savedFiles);
         const base64ToFile = (base64: string, filename: string): File => {
-          const arr = base64.split(',');
+          const arr  = base64.split(',');
           const mime = arr[0].match(/:(.*?);/)![1];
           const bstr = atob(arr[1]);
           let n = bstr.length;
           const u8arr = new Uint8Array(n);
-          while (n--) {
-            u8arr[n] = bstr.charCodeAt(n);
-          }
+          while (n--) u8arr[n] = bstr.charCodeAt(n);
           return new File([u8arr], filename, { type: mime });
         };
-
         setFiles({
           htf: parsed.htf ? base64ToFile(parsed.htf.data, parsed.htf.name) : null,
           mid: parsed.mid ? base64ToFile(parsed.mid.data, parsed.mid.name) : null,
           ltf: parsed.ltf ? base64ToFile(parsed.ltf.data, parsed.ltf.name) : null,
         });
       } catch (e) {
-        console.error("Failed to recover input files", e);
+        console.error('Failed to recover input files', e);
+        toast.warning('Could not restore previously uploaded chart images.', 'Files Not Restored');
       }
     }
 
     if (savedTab === 'analysis' || savedTab === 'history') {
       setActiveTab(savedTab);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist analysis result
+  // ── Persist analysis result ──────────────────────────────────────────────
   React.useEffect(() => {
     if (analysisResult) {
       localStorage.setItem('hive_analysis_result', JSON.stringify(analysisResult));
     }
   }, [analysisResult]);
 
-  // Persist active tab
+  // ── Persist active tab ───────────────────────────────────────────────────
   React.useEffect(() => {
     localStorage.setItem('hive_active_tab', activeTab);
   }, [activeTab]);
 
-  // Persist input files
+  // ── Persist input files (debounced) ─────────────────────────────────────
   React.useEffect(() => {
     const saveFiles = async () => {
-      const fileToBase64 = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
+      const fileToBase64 = (file: File): Promise<string> =>
+        new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = error => reject(error);
+          reader.onload  = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
         });
-      };
 
       try {
-        const filesData: any = {};
-        if (files.htf) {
-          filesData.htf = { name: files.htf.name, data: await fileToBase64(files.htf) };
-        }
-        if (files.mid) {
-          filesData.mid = { name: files.mid.name, data: await fileToBase64(files.mid) };
-        }
-        if (files.ltf) {
-          filesData.ltf = { name: files.ltf.name, data: await fileToBase64(files.ltf) };
-        }
-
+        const filesData: Record<string, { name: string; data: string }> = {};
+        if (files.htf) filesData.htf = { name: files.htf.name, data: await fileToBase64(files.htf) };
+        if (files.mid) filesData.mid = { name: files.mid.name, data: await fileToBase64(files.mid) };
+        if (files.ltf) filesData.ltf = { name: files.ltf.name, data: await fileToBase64(files.ltf) };
         if (Object.keys(filesData).length > 0) {
           localStorage.setItem('hive_input_files', JSON.stringify(filesData));
         }
       } catch (e) {
         console.warn('Storage quota exceeded, images not saved', e);
+        toast.warning('Storage quota exceeded. Chart images could not be saved.', 'Storage Full');
       }
     };
 
-    const timeoutId = setTimeout(() => {
-      saveFiles();
-    }, 500); // Debounce to avoid freezing UI on rapid changes
-
-    return () => clearTimeout(timeoutId);
+    const id = setTimeout(saveFiles, 500);
+    return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files]);
 
-  // Auto scroll to execution panel on mobile when processing starts/finishes
+  // ── Auto-scroll to result panel on mobile ───────────────────────────────
   React.useEffect(() => {
     if (status !== 'awaiting' && window.innerWidth < 1024) {
-      setTimeout(() => {
-        executionPanelRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      setTimeout(() => executionPanelRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
   }, [status]);
 
-  const handleAnalysis = async (files: { htf: File, mid: File, ltf: File }) => {
+  // ── Main analysis handler ────────────────────────────────────────────────
+  const handleAnalysis = async (uploadedFiles: { htf: File; mid: File; ltf: File }) => {
     setIsProcessing(true);
     setStatus('analyzing');
     setAnalysisResult(undefined);
 
-    // Use our internal API proxy to avoid CORS issues
-    const proxyUrl = '/api/analyze';
-
     try {
       const formData = new FormData();
+      formData.append('image_htf', uploadedFiles.htf);
+      formData.append('image_mid', uploadedFiles.mid);
+      formData.append('image_ltf', uploadedFiles.ltf);
 
-      // Append files with specific keys matching n8n logic
-      formData.append('image_htf', files.htf);  // 4H Chart
-      formData.append('image_mid', files.mid); // 1H Chart
-      formData.append('image_ltf', files.ltf); // 15M Chart
-
-      // Send to Next.js API Proxy
-      const response = await axios.post(proxyUrl, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const response = await axios.post('/api/analyze', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000, // 2-min hard timeout — prevents infinite hang when n8n is down
       });
 
       if (response.data) {
-        // Handle n8n response via proxy
         const data = Array.isArray(response.data) ? response.data[0] : response.data;
 
-        // Check for error from proxy
-        if (data.error) {
-          throw new Error(data.error);
-        }
+        if (data.error) throw new Error(data.error);
 
         setAnalysisResult({
-          signal: data.signal_type || data.signal || 'WAIT',
-          sl: data.stop_loss || 0,
-          tp: data.take_profit || 0,
-          reasoning: data.reasoning || "No reasoning provided.",
-          confidence: data.confidence || 0,
-          asset: data.asset_name || "Unknown Asset"
+          signal:      data.signal_type  || data.signal    || 'WAIT',
+          sl:          data.stop_loss    || data.sl         || 0,
+          tp:          data.take_profit  || data.tp         || 0,
+          reasoning:   data.reasoning    || 'No reasoning provided.',
+          confidence:  data.confidence   || 0,
+          asset:       data.asset_name   || data.asset      || 'Unknown Asset',
+          chartHtfUrl: data.chart_htf_url ?? null,
+          chartMidUrl: data.chart_mid_url ?? null,
+          chartLtfUrl: data.chart_ltf_url ?? null,
         });
 
         setStatus('completed');
         setHasAnalyzed(true);
         setMobilePanelView('result');
+        toast.success(
+          `${data.signal_type || data.signal || 'WAIT'} signal generated for ${data.asset_name || data.asset || 'your asset'}.`,
+          'Analysis Complete'
+        );
       } else {
-        throw new Error("No data returned from analysis");
+        throw new Error('No data returned from analysis');
       }
 
     } catch (error: any) {
-      console.error("Analysis Failed:", error);
+      console.error('Analysis Failed:', error);
       setStatus('awaiting');
 
-      const errorData = error.response?.data;
-      const errorMessage = errorData?.error || error.message || 'Unknown error occurred';
+      const errorData    = error.response?.data;
+      const errorMessage: string =
+        errorData?.error   ||
+        errorData?.message ||
+        error.message      ||
+        'Unknown error occurred';
 
-      // Fallback or warning logic can be handled here if needed
-      if (errorMessage.includes('N8N Webhook URL is not configured')) {
-        console.warn("Check your .env.local configuration.");
+      if (errorMessage.includes('N8N Webhook URL is not configured') || errorMessage.includes('Check .env.local')) {
+        toast.error('The N8N Webhook URL is not configured. Please check your .env.local file.', 'Configuration Error', Infinity);
+      } else if (
+        errorMessage.includes('Network Error') ||
+        errorMessage.includes('ECONNREFUSED') ||
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ERR_NETWORK'
+      ) {
+        toast.error('Cannot reach the analysis server. Make sure n8n is running and accessible.', 'Connection Error');
+      } else if (
+        error.code === 'ECONNABORTED' ||
+        errorMessage.toLowerCase().includes('timeout') ||
+        errorMessage.includes('408')
+      ) {
+        toast.error('The request timed out after 2 minutes. n8n may be overloaded or unreachable.', 'Request Timed Out');
+      } else if (errorMessage.includes('Respond Immediately') || errorMessage.includes('Workflow was started')) {
+        toast.error('N8N is set to "Respond Immediately". Change the webhook to "Using Respond to Webhook Node".', 'N8N Config Error', Infinity);
+      } else if (errorMessage.includes('No data returned') || errorMessage.includes('Empty response')) {
+        toast.error('The server returned an empty response. Please try again.', 'Empty Response');
+      } else if (error.response?.status === 401) {
+        toast.error('You must be logged in to run an analysis.', 'Unauthorized');
+      } else if (error.response?.status >= 500) {
+        toast.error(`Server error (${error.response.status}). Check your n8n workflow and API logs.`, 'Server Error');
+      } else {
+        toast.error(errorMessage, 'Analysis Failed');
       }
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // ── View a trade from history ────────────────────────────────────────────
+  const handleViewTrade = (trade: Trade) => {
+    setAnalysisResult({
+      signal:      trade.signal,
+      sl:          trade.sl,
+      tp:          trade.tp,
+      reasoning:   trade.reasoning,
+      confidence:  trade.confidence,
+      asset:       trade.asset,
+      chartHtfUrl: trade.chart_htf_url ?? null,
+      chartMidUrl: trade.chart_mid_url ?? null,
+      chartLtfUrl: trade.chart_ltf_url ?? null,
+    });
+    setStatus('completed');
+    setActiveTab('analysis');
+    setMobilePanelView('result');
+  };
+
+  // ────────────────────────────────────────────────────────────────────────
   return (
-    <main className="flex flex-col h-[100dvh] w-full overflow-hidden font-sans selection:bg-amber-100 selection:text-amber-900 transition-colors duration-300 relative" style={{ backgroundColor: 'var(--bg)' }}>
+    <main
+      className="flex flex-col h-[100dvh] w-full overflow-hidden font-sans selection:bg-amber-100 selection:text-amber-900 transition-colors duration-300 relative"
+      style={{ backgroundColor: 'var(--bg)' }}
+    >
 
       {/* Header */}
-      <Header 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
+      <Header
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         mobilePanelView={mobilePanelView}
         onMobilePanelChange={setMobilePanelView}
       />
@@ -219,12 +255,13 @@ export default function Home() {
 
         {activeTab === 'analysis' ? (
           <div className="flex flex-col lg:flex-row gap-6 h-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
-            {/* Left Panel: Input Source */}
+
+            {/* Left Panel: Chart Input */}
             <div className={`w-full lg:w-[400px] flex-shrink-0 h-full ${mobilePanelView === 'upload' ? 'block' : 'hidden lg:block'}`}>
-              {/* @ts-ignore - Temporary until InputPanel types are reloaded */}
+              {/* @ts-ignore */}
               <InputPanel
                 files={files}
-                onFilesChange={(newFiles) => {
+                onFilesChange={(newFiles: InputPanelFiles) => {
                   setFiles(newFiles);
                   setHasAnalyzed(false);
                 }}
@@ -241,28 +278,21 @@ export default function Home() {
               />
             </div>
 
-            {/* Right Panel: AI Execution Engine */}
-            <div ref={executionPanelRef} className={`flex-1 w-full h-[500px] sm:h-[600px] lg:h-full ${mobilePanelView === 'result' ? 'block' : 'hidden lg:block'}`}>
+            {/* Right Panel: AI Output */}
+            <div
+              ref={executionPanelRef}
+              className={`flex-1 w-full h-[500px] sm:h-[600px] lg:h-full ${mobilePanelView === 'result' ? 'block' : 'hidden lg:block'}`}
+            >
               <ExecutionPanel status={status} result={analysisResult} />
             </div>
+
           </div>
         ) : (
           <div className="h-full max-w-[1200px] mx-auto w-full animate-in fade-in duration-500">
             <HistoryTable
-              onView={(trade) => {
-                setAnalysisResult({
-                  signal: trade.signal,
-                  sl: trade.sl,
-                  tp: trade.tp,
-                  reasoning: trade.reasoning,
-                  confidence: trade.confidence,
-                  asset: trade.asset
-                });
-                setActiveTab('analysis');
-                setMobilePanelView('result');
-              }}
-              onDelete={async (id) => {
-                // Optimistic update handled in component, or refresh here if needed
+              onView={handleViewTrade}
+              onDelete={(_id: string) => {
+                // Optimistic delete handled inside HistoryTable
               }}
             />
           </div>
@@ -270,9 +300,9 @@ export default function Home() {
 
       </div>
 
-      {/* Decorative Blur Elements - Hardware accelerated with transform-gpu to prevent mobile lag */}
-      <div className="fixed -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-1)' }}></div>
-      <div className="fixed -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-2)' }}></div>
+      {/* Decorative blur background elements */}
+      <div className="fixed -bottom-32 -left-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu" style={{ backgroundColor: 'var(--blur-1)' }} />
+      <div className="fixed -top-32 -right-32 w-96 h-96 rounded-full blur-[150px] pointer-events-none z-0 transform-gpu"  style={{ backgroundColor: 'var(--blur-2)' }} />
 
     </main>
   );

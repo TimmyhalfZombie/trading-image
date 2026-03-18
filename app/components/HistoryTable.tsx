@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { AlertCircle, Inbox, Loader2, RotateCcw, ArrowUpRight, Trash2, TrendingUp, TrendingDown, Minus, ChevronDown, X, Check } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { DeleteModal } from './modals/DeleteModal';
+import { useToast } from './Toast';
 
 interface SelectOption {
     label: string;
@@ -88,6 +89,9 @@ export interface Trade {
     sl: number;
     tp: number;
     reasoning: string;
+    chart_htf_url?: string | null;
+    chart_mid_url?: string | null;
+    chart_ltf_url?: string | null;
 }
 
 interface HistoryTableProps {
@@ -96,6 +100,7 @@ interface HistoryTableProps {
 }
 
 export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
+    const toast = useToast();
     const [trades, setTrades] = useState<Trade[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -159,7 +164,7 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || errorData.details || errorMessage;
-                } catch (e) {
+                } catch {
                     // unexpected error format
                 }
                 throw new Error(errorMessage);
@@ -168,7 +173,9 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
             setTrades(data);
         } catch (err: any) {
             console.error(err);
-            setError(err.message || 'Failed to load history.');
+            const msg = err.message || 'Failed to load history.';
+            setError(msg);
+            toast.error(msg, 'History Load Failed');
         } finally {
             setIsLoading(false);
         }
@@ -192,6 +199,7 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                 setTrades([]);
             } catch (error: any) {
                 console.error('Delete all failed', error);
+                toast.error(error.message || 'Could not clear all records.', 'Delete Failed');
             }
         } else if (type === 'single' && id) {
             setDeletingId(id);
@@ -209,6 +217,7 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
                 if (onDelete) onDelete(id);
             } catch (error: any) {
                 console.error('Delete failed', error);
+                toast.error(error.message || 'Could not delete the record.', 'Delete Failed');
             } finally {
                 setDeletingId(null);
             }
@@ -227,6 +236,7 @@ export function HistoryTable({ onView, onDelete }: HistoryTableProps) {
 
     useEffect(() => {
         fetchTrades();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ---------- LOADING STATE ----------

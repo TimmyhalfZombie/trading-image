@@ -1,100 +1,114 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rate-limit';
 import sharp from 'sharp';
 
-/**
- * Normalizes a chart image for AI analysis.
- * If the image is portrait-oriented (height > width — typical of mobile screenshots),
- * it is rotated 90° clockwise to convert it to landscape so the AI can correctly
- * read chart structure, trend lines, and price action.
- */
-async function normalizeChartOrientation(file: File): Promise<{ buffer: Buffer; filename: string; mimetype: string }> {
-    const arrayBuffer = await file.arrayBuffer();
-    const inputBuffer = Buffer.from(arrayBuffer);
+// ─── Env helpers (server-only — no NEXT_PUBLIC_ prefix) ──────────────────────
+const getWebhookUrl    = () => process.env.N8N_WEBHOOK_URL;
+const getWebhookSecret = () => process.env.N8N_WEBHOOK_SECRET;
 
-    const image = sharp(inputBuffer);
+const isDev = process.env.NODE_ENV === 'development';
+
+// Safe logger that only emits in development
+const log = {
+    info:  (...args: unknown[]) => { if (isDev) console.log('[analyze]', ...args); },
+    warn:  (...args: unknown[]) => { if (isDev) console.warn('[analyze]', ...args); },
+    error: (...args: unknown[]) => console.error('[analyze]', ...args), // always log errors
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Image normalisation
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function normalizeChartOrientation(
+    file: File
+): Promise<{ buffer: Buffer; filename: string; mimetype: string }> {
+    const inputBuffer = Buffer.from(await file.arrayBuffer());
+    const image    = sharp(inputBuffer);
     const metadata = await image.metadata();
+    const w = metadata.width  ?? 0;
+    const h = metadata.height ?? 0;
 
-    const width = metadata.width ?? 0;
-    const height = metadata.height ?? 0;
+    log.info(`${file.name}: ${w}x${h} (${h > w ? 'portrait → landscape' : 'landscape'})`);
 
-    console.log(`[ImageNorm] ${file.name}: ${width}x${height} (${width < height ? 'PORTRAIT → rotating to landscape' : 'landscape, no change'})`);
+    const outputBuffer = await (h > w ? image.rotate(90) : image)
+        .toFormat('jpeg', { quality: 92 })
+        .toBuffer();
 
-    let outputBuffer: Buffer;
-    if (height > width) {
-        // Portrait (mobile) chart detected — rotate 90° clockwise to make it landscape
-        // so the AI can read horizontal price action and trend structure correctly
-        outputBuffer = await image
-            .rotate(90)
-            .toFormat('jpeg', { quality: 92 })
-            .toBuffer();
-    } else {
-        // Already landscape — pass through as-is (re-encode to ensure consistent format)
-        outputBuffer = await image
-            .toFormat('jpeg', { quality: 92 })
-            .toBuffer();
-    }
-
-    const filename = file.name.replace(/\.[^.]+$/, '') + '_normalized.jpg';
-    return { buffer: outputBuffer, filename, mimetype: 'image/jpeg' };
+    return {
+        buffer:   outputBuffer,
+        filename: file.name.replace(/\.[^.]+$/, '') + '_normalized.jpg',
+        mimetype: 'image/jpeg',
+    };
 }
 
-export async function POST(request: Request) {
-    console.log("Analyze API hit");
-    try {
-        const formData = await request.formData();
-        const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
-        console.log("Webhook URL:", webhookUrl);
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/analyze
+// ─────────────────────────────────────────────────────────────────────────────
 
+export async function POST(request: Request) {
+    try {
+        // ── 1. Validate server config ──────────────────────────────────────
+        const webhookUrl = getWebhookUrl();
         if (!webhookUrl) {
-            console.error("Missing webhook URL");
             return NextResponse.json(
-                { error: 'N8N Webhook URL is not configured (Check .env.local)' },
+                { error: 'Analysis service is not configured.' },
                 { status: 500 }
             );
         }
 
-        // --- AUTHENTICATE USER BEFORE DOING ANYTHING ---
+        // ── 2. Authenticate user ──────────────────────────────────────────
         const supabase = await createClient();
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        console.log("Analyzing who is the user:", user?.id, "Error:", userError);
+        const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-             return NextResponse.json({ error: 'Unauthorized: Please log in to analyze charts' }, { status: 401 });
+            return NextResponse.json(
+                { error: 'Unauthorized: Please log in to analyze charts.' },
+                { status: 401 }
+            );
         }
 
-        // Create a new FormData instance to forward to n8n
-        const n8nFormData = new FormData();
-        
-        // Let N8n know who the user is, in case N8n has a Supabase insertion node as well
-        n8nFormData.append('user_id', user.id);
+        // ── 3. Rate limit: 5 analyses per minute per user ─────────────────
+        const rl = checkRateLimit(`analyze:${user.id}`, 5, 60_000);
+        if (!rl.allowed) {
+            return NextResponse.json(
+                { error: 'Too many analysis requests. Please wait a moment.' },
+                { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetInMs / 1000)) } }
+            );
+        }
 
-        // Retrieve files from the incoming request
+        // ── 4. Extract & validate uploaded files ──────────────────────────
+        const formData = await request.formData();
         const htf = formData.get('image_htf');
         const mid = formData.get('image_mid');
         const ltf = formData.get('image_ltf');
 
-        console.log("Files received:", {
-            htf: htf instanceof File ? `File: ${htf.name} (${htf.size})` : 'Missing',
-            mid: mid instanceof File ? `File: ${mid.name} (${mid.size})` : 'Missing',
-            ltf: ltf instanceof File ? `File: ${ltf.name} (${ltf.size})` : 'Missing',
+        log.info('Files received:', {
+            htf: htf instanceof File ? `${htf.name} (${htf.size}b)` : 'Missing',
+            mid: mid instanceof File ? `${mid.name} (${mid.size}b)` : 'Missing',
+            ltf: ltf instanceof File ? `${ltf.name} (${ltf.size}b)` : 'Missing',
         });
 
-        /**
-         * Normalize each image orientation before forwarding to n8n.
-         * Portrait-mode mobile screenshots are rotated to landscape so the AI
-         * can properly perform technical analysis (trend, structure, S/R levels).
-         */
+        // ── 5. Normalize images & build n8n payload ───────────────────────
+        const n8nFormData = new FormData();
+        n8nFormData.append('user_id', user.id);
+
+        type NormalizedImage = { buffer: Buffer; filename: string; mimetype: string };
+        const normalized: Record<string, NormalizedImage | null> = {
+            image_htf: null,
+            image_mid: null,
+            image_ltf: null,
+        };
+
         const normalizeAndAppend = async (key: string, file: FormDataEntryValue | null) => {
             if (!file || !(file instanceof File)) return;
             try {
-                const { buffer, filename, mimetype } = await normalizeChartOrientation(file);
-                // Convert Buffer to Uint8Array for Blob compatibility (TypeScript strict mode)
-                const normalizedBlob = new Blob([new Uint8Array(buffer)], { type: mimetype });
-                n8nFormData.append(key, normalizedBlob, filename);
+                const result = await normalizeChartOrientation(file);
+                normalized[key] = result;
+                const blob = new Blob([new Uint8Array(result.buffer)], { type: result.mimetype });
+                n8nFormData.append(key, blob, result.filename);
             } catch (err) {
-                // If normalization fails for any reason, fall back to the original file
-                console.warn(`[ImageNorm] Failed to normalize ${key}, using original:`, err);
+                log.warn(`Failed to normalize ${key}, using original:`, err);
                 n8nFormData.append(key, file, file.name);
             }
         };
@@ -105,124 +119,195 @@ export async function POST(request: Request) {
             normalizeAndAppend('image_ltf', ltf),
         ]);
 
-        console.log("Sending to N8N...");
+        // ── 6. Forward to n8n (with auth + timeout) ───────────────────────
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 90_000); // 90 s server-side timeout
 
-        // Perform the server-to-server POST request to the n8n webhook
-        const response = await fetch(webhookUrl, {
-            method: 'POST',
-            body: n8nFormData,
-            // fetch() automatically sets the correct Content-Type with boundary
-            // for FormData.
-        });
-
-        console.log("N8N Response status:", response.status);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('n8n error body:', errorText);
-
-            // Return error response to the client
-            return NextResponse.json(
-                {
-                    error: `n8n Error: ${response.status} ${response.statusText}`,
-                    details: errorText.substring(0, 500) // Truncate just in case
-                },
-                { status: response.status }
-            );
+        const webhookSecret = getWebhookSecret();
+        const headers: Record<string, string> = {};
+        if (webhookSecret) {
+            headers['X-Webhook-Secret'] = webhookSecret;
         }
 
-        // Read the response as text first to avoid "Body is unusable" if json() fails
-        const responseText = await response.text();
-        console.log("N8N Raw Response:", responseText);
-
-        let data;
+        let response: Response;
         try {
-            if (!responseText) {
-                throw new Error("Empty response from N8N");
-            }
-
-            // Check for specific N8N text responses that aren't JSON
-            if (responseText.includes("Workflow was started")) {
+            response = await fetch(webhookUrl, {
+                method: 'POST',
+                body: n8nFormData,
+                headers,
+                signal: controller.signal,
+            });
+        } catch (fetchErr: any) {
+            clearTimeout(timeout);
+            if (fetchErr.name === 'AbortError') {
                 return NextResponse.json(
-                    {
-                        error: "N8N Configuration Error",
-                        details: "Your N8N Webhook is set to 'Respond Immediately'. Please change the Webhook node setting 'Respond' to 'Using Respond to Webhook Node' so it waits for the AI analysis."
-                    },
-                    { status: 400 } // Bad Request because configuration is wrong
+                    { error: 'The analysis timed out. Please try again.' },
+                    { status: 504 }
                 );
             }
-
-            if (responseText.trim().startsWith("<")) {
-                return NextResponse.json(
-                    {
-                        error: "N8N returned HTML instead of JSON",
-                        details: "Check if the Webhook URL is correct and the workflow is active. You might be hitting a 404 page or login page."
-                    },
-                    { status: 502 }
-                );
-            }
-
-            data = JSON.parse(responseText);
-            console.log("N8N Data parsed successfully");
-
-            // --- SAVE TO SUPABASE ---
-
-            // Normalize the data (handle array or single object)
-            const result = Array.isArray(data) ? data[0] : data;
-
-            // Only attempt to save if we have a valid signal and supabase client
-            if (supabase && user && result && (result.signal || result.signal_type)) {
-                console.log("Next.js attempting to insert into Supabase as user:", user.id);
-                try {
-                    const { error: dbError } = await supabase
-                        .from('trading_signals')
-                        .insert([
-                            {
-                                user_id: user.id,
-                                asset_name: result.asset_name || result.asset || 'Unknown',
-                                signal_type: (result.signal_type || result.signal || 'WAIT').toUpperCase(),
-                                outcome: 'pending',
-                                stop_loss: result.stop_loss || result.sl || 0,
-                                take_profit: result.take_profit || result.tp || 0,
-                                reasoning: result.reasoning || "No reasoning provided",
-                                confidence: result.confidence || 0,
-                                setup_type: result.setup_type || 'Standard'
-                            }
-                        ]);
-
-                    if (dbError) {
-                        console.error("Failed to save analysis to Supabase:", dbError);
-                        // We don't stop the response, just log the error
-                    } else {
-                        console.log("Analysis saved to Supabase history.");
-                    }
-                } catch (dbEx) {
-                    console.error("Error inserting into Supabase:", dbEx);
-                }
-            }
-            // ------------------------
-
-        } catch (jsonError) {
-            console.error("Failed to parse N8N JSON response", jsonError);
+            log.error('Failed to reach n8n:', fetchErr.message);
             return NextResponse.json(
-                {
-                    error: "Invalid JSON response from N8N",
-                    details: `Raw response start: ${responseText.substring(0, 200)}...`
-                },
+                { error: 'Cannot reach the analysis service.' },
+                { status: 502 }
+            );
+        } finally {
+            clearTimeout(timeout);
+        }
+
+        // ── 7. Handle non-OK responses from n8n ──────────────────────────
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            log.error('n8n error:', response.status, errorText);
+
+            // Generic error — never forward raw n8n internals
+            return NextResponse.json(
+                { error: 'The analysis service returned an error. Please try again.' },
                 { status: 502 }
             );
         }
 
+        // ── 8. Parse n8n JSON response ───────────────────────────────────
+        const responseText = await response.text();
+        log.info('n8n response length:', responseText.length);
+
+        if (!responseText) {
+            return NextResponse.json(
+                { error: 'The analysis service returned an empty response.' },
+                { status: 502 }
+            );
+        }
+
+        if (responseText.includes('Workflow was started')) {
+            return NextResponse.json(
+                { error: 'N8N webhook is set to "Respond Immediately". Change to "Using Respond to Webhook Node".' },
+                { status: 400 }
+            );
+        }
+
+        if (responseText.trim().startsWith('<')) {
+            return NextResponse.json(
+                { error: 'The analysis service returned an unexpected response format.' },
+                { status: 502 }
+            );
+        }
+
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch {
+            log.error('Failed to parse n8n JSON');
+            return NextResponse.json(
+                { error: 'Invalid response from analysis service.' },
+                { status: 502 }
+            );
+        }
+
+        // ── 9. Upload chart images to Supabase Storage ───────────────────
+        const result = Array.isArray(data) ? data[0] : data;
+
+        let chartPaths: Record<string, string | null> = {
+            htf: null, mid: null, ltf: null,
+        };
+
+        if (result && (result.signal || result.signal_type)) {
+            // Upload each image and store the STORAGE PATH (not public URL)
+            const uploadImage = async (key: string, label: string): Promise<string | null> => {
+                const img = normalized[key];
+                if (!img) return null;
+                try {
+                    const storagePath = `${user.id}/${Date.now()}_${label}.jpg`;
+                    const { error: uploadError } = await supabase.storage
+                        .from('chart-images')
+                        .upload(storagePath, new Uint8Array(img.buffer), {
+                            contentType: img.mimetype,
+                            upsert: false,
+                        });
+
+                    if (uploadError) {
+                        log.warn(`Storage upload failed (${label}):`, uploadError.message);
+                        return null;
+                    }
+                    return storagePath; // Store path, NOT full URL
+                } catch (err) {
+                    log.warn(`Storage error (${label}):`, err);
+                    return null;
+                }
+            };
+
+            const [htfPath, midPath, ltfPath] = await Promise.all([
+                uploadImage('image_htf', 'htf'),
+                uploadImage('image_mid', 'mid'),
+                uploadImage('image_ltf', 'ltf'),
+            ]);
+
+            chartPaths = { htf: htfPath, mid: midPath, ltf: ltfPath };
+            log.info('Chart paths:', chartPaths);
+
+            // ── 10. Save signal record to Supabase ───────────────────────
+            try {
+                const { error: dbError } = await supabase
+                    .from('trading_signals')
+                    .insert([{
+                        user_id:       user.id,
+                        asset_name:    result.asset_name  || result.asset  || 'Unknown',
+                        signal_type:   (result.signal_type || result.signal || 'WAIT').toUpperCase(),
+                        outcome:       'pending',
+                        stop_loss:     result.stop_loss    || result.sl    || 0,
+                        take_profit:   result.take_profit  || result.tp    || 0,
+                        reasoning:     result.reasoning    || 'No reasoning provided',
+                        confidence:    result.confidence   || 0,
+                        setup_type:    result.setup_type   || 'Standard',
+                        chart_htf_url: htfPath,
+                        chart_mid_url: midPath,
+                        chart_ltf_url: ltfPath,
+                    }]);
+
+                if (dbError) {
+                    log.error('DB insert failed:', dbError.message);
+                }
+            } catch (dbEx) {
+                log.error('DB error:', dbEx);
+            }
+
+            // ── 11. Generate signed URLs for immediate frontend display ──
+            const signUrl = async (path: string | null): Promise<string | null> => {
+                if (!path) return null;
+                try {
+                    const { data: signed, error } = await supabase.storage
+                        .from('chart-images')
+                        .createSignedUrl(path, 3600); // 1-hour expiry
+                    if (error || !signed?.signedUrl) return null;
+                    return signed.signedUrl;
+                } catch {
+                    return null;
+                }
+            };
+
+            const [htfSignedUrl, midSignedUrl, ltfSignedUrl] = await Promise.all([
+                signUrl(htfPath),
+                signUrl(midPath),
+                signUrl(ltfPath),
+            ]);
+
+            // Attach signed URLs to the response payload
+            if (Array.isArray(data)) {
+                data[0].chart_htf_url = htfSignedUrl;
+                data[0].chart_mid_url = midSignedUrl;
+                data[0].chart_ltf_url = ltfSignedUrl;
+            } else {
+                data.chart_htf_url = htfSignedUrl;
+                data.chart_mid_url = midSignedUrl;
+                data.chart_ltf_url = ltfSignedUrl;
+            }
+        }
+
         return NextResponse.json(data);
 
-    } catch (error: any) {
-        console.error('Proxy Error Context:', error);
-        // Include stack trace/cause if available for local debugging
+    } catch (error: unknown) {
+        // FIX #3: NEVER leak internal error details to the client
+        log.error('Unhandled error in /api/analyze:', error);
         return NextResponse.json(
-            {
-                error: error.message || 'Internal Server Error',
-                cause: error.cause ? String(error.cause) : undefined
-            },
+            { error: 'Internal server error. Please try again later.' },
             { status: 500 }
         );
     }
