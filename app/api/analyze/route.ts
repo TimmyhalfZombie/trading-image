@@ -4,8 +4,8 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import sharp from 'sharp';
 
 // ─── Env helpers (server-only — no NEXT_PUBLIC_ prefix) ──────────────────────
-const getWebhookUrl    = () => process.env.N8N_WEBHOOK_URL;
-const getWebhookSecret = () => process.env.N8N_WEBHOOK_SECRET;
+const getWebhookUrl    = () => process.env['N8N_WEBHOOK_URL'] || 'http://localhost:5678/webhook/trading-analysis-v4';
+const getWebhookSecret = () => process.env['N8N_WEBHOOK_SECRET'] || '';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
 
         // ── 6. Forward to n8n (with auth + timeout) ───────────────────────
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 90_000); // 90 s server-side timeout
+        const timeout = setTimeout(() => controller.abort(), 115_000); // 115 s server-side timeout
 
         const webhookSecret = getWebhookSecret();
         const headers: Record<string, string> = {};
