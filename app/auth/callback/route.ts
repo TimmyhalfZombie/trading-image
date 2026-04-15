@@ -13,9 +13,21 @@ export async function GET(request: Request) {
         const supabase = await createClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
-            return NextResponse.redirect(`${origin}${safeNext}`)
+            const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
+            const isLocalEnv = process.env.NODE_ENV === 'development'
+            if (isLocalEnv) {
+                return NextResponse.redirect(`${origin}${safeNext}`)
+            } else if (forwardedHost) {
+                return NextResponse.redirect(`https://${forwardedHost}${safeNext}`)
+            } else {
+                return NextResponse.redirect(`${origin}${safeNext}`)
+            }
         }
     }
 
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const isLocalEnv = process.env.NODE_ENV === 'development'
+    const redirectOrigin = (!isLocalEnv && forwardedHost) ? `https://${forwardedHost}` : origin;
+
+    return NextResponse.redirect(`${redirectOrigin}/login?error=auth_failed`)
 }
