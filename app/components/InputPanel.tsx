@@ -182,11 +182,7 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
                     <p className="text-[11px] mt-0.5 hidden md:block" style={{ color: 'var(--text-tertiary)' }}>Upload multi-timeframe screenshots</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {isLoading && (
-                        <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Processing
-                        </span>
-                    )}
+
                     {(hasAnyFile || !!hasAnyChartUrl) && !isLoading && (
                         <button
                             onClick={() => {

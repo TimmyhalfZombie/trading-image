@@ -3,16 +3,20 @@ import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rate-limit';
 import sharp from 'sharp';
 
+// Increase Vercel function timeout to the maximum allowed on Hobby tier (60 seconds)
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 // ─── Env helpers (server-only — no NEXT_PUBLIC_ prefix) ──────────────────────
-const getWebhookUrl    = () => process.env['N8N_WEBHOOK_URL'] || 'http://localhost:5678/webhook/trading-analysis-v4';
+const getWebhookUrl = () => process.env['N8N_WEBHOOK_URL'] || 'http://localhost:5678/webhook/trading-analysis-v4';
 const getWebhookSecret = () => process.env['N8N_WEBHOOK_SECRET'] || '';
 
 const isDev = process.env.NODE_ENV === 'development';
 
 // Safe logger that only emits in development
 const log = {
-    info:  (...args: unknown[]) => { if (isDev) console.log('[analyze]', ...args); },
-    warn:  (...args: unknown[]) => { if (isDev) console.warn('[analyze]', ...args); },
+    info: (...args: unknown[]) => { if (isDev) console.log('[analyze]', ...args); },
+    warn: (...args: unknown[]) => { if (isDev) console.warn('[analyze]', ...args); },
     error: (...args: unknown[]) => console.error('[analyze]', ...args), // always log errors
 };
 
@@ -24,9 +28,9 @@ async function normalizeChartOrientation(
     file: File
 ): Promise<{ buffer: Buffer; filename: string; mimetype: string }> {
     const inputBuffer = Buffer.from(await file.arrayBuffer());
-    const image    = sharp(inputBuffer);
+    const image = sharp(inputBuffer);
     const metadata = await image.metadata();
-    const w = metadata.width  ?? 0;
+    const w = metadata.width ?? 0;
     const h = metadata.height ?? 0;
 
     log.info(`${file.name}: ${w}x${h} (${h > w ? 'portrait → landscape' : 'landscape'})`);
@@ -36,7 +40,7 @@ async function normalizeChartOrientation(
         .toBuffer();
 
     return {
-        buffer:   outputBuffer,
+        buffer: outputBuffer,
         filename: file.name.replace(/\.[^.]+$/, '') + '_normalized.jpg',
         mimetype: 'image/jpeg',
     };
@@ -248,15 +252,15 @@ export async function POST(request: Request) {
                 const { error: dbError } = await supabase
                     .from('trading_signals')
                     .insert([{
-                        user_id:       user.id,
-                        asset_name:    result.asset_name  || result.asset  || 'Unknown',
-                        signal_type:   (result.signal_type || result.signal || 'WAIT').toUpperCase(),
-                        outcome:       'pending',
-                        stop_loss:     result.stop_loss    || result.sl    || 0,
-                        take_profit:   result.take_profit  || result.tp    || 0,
-                        reasoning:     result.reasoning    || 'No reasoning provided',
-                        confidence:    result.confidence   || 0,
-                        setup_type:    result.setup_type   || 'Standard',
+                        user_id: user.id,
+                        asset_name: result.asset_name || result.asset || 'Unknown',
+                        signal_type: (result.signal_type || result.signal || 'WAIT').toUpperCase(),
+                        outcome: 'pending',
+                        stop_loss: result.stop_loss || result.sl || 0,
+                        take_profit: result.take_profit || result.tp || 0,
+                        reasoning: result.reasoning || 'No reasoning provided',
+                        confidence: result.confidence || 0,
+                        setup_type: result.setup_type || 'Standard',
                         chart_htf_url: htfPath,
                         chart_mid_url: midPath,
                         chart_ltf_url: ltfPath,
