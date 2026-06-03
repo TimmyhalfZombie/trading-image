@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useToast } from './components/Toast';
 import { type Trade } from './components/HistoryTable';
 import axios from 'axios';
@@ -8,6 +8,7 @@ import { Header } from './components/Header';
 import { InputPanel, InputPanelFiles } from './components/InputPanel';
 import { ExecutionPanel } from './components/ExecutionPanel';
 import { HistoryTable } from './components/HistoryTable';
+import { PlansPage } from './components/PlansPage';
 
 interface AnalysisResult {
   signal: 'BUY' | 'SELL' | 'WAIT' | 'NEUTRAL';
@@ -21,9 +22,20 @@ interface AnalysisResult {
   chartLtfUrl?: string | null;
 }
 
+interface TokenInfo {
+  plan: string;
+  planName: string;
+  limit: number;
+  used: number;
+  remaining: number;
+  canAnalyze: boolean;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: string | null;
+}
+
 export default function Home() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'analysis' | 'history'>('analysis');
+  const [activeTab, setActiveTab] = useState<'analysis' | 'history' | 'plans'>('analysis');
   const [mobilePanelView, setMobilePanelView] = useState<'upload' | 'result'>('upload');
   const executionPanelRef = React.useRef<HTMLDivElement>(null);
 
@@ -32,6 +44,26 @@ export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | undefined>(undefined);
   const [status, setStatus] = useState<'awaiting' | 'analyzing' | 'completed'>('awaiting');
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+
+  // ── Token state ─────────────────────────────────────────────────────────
+  const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
+
+  const fetchTokenInfo = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tokens');
+      if (res.ok) {
+        const data = await res.json();
+        setTokenInfo(data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch token info:', err);
+    }
+  }, []);
+
+  // Fetch token info on mount and when tab changes
+  React.useEffect(() => {
+    fetchTokenInfo();
+  }, [fetchTokenInfo]);
 
   // ── Restore from localStorage on mount ──────────────────────────────────
   React.useEffect(() => {
@@ -90,7 +122,10 @@ export default function Home() {
 
   // ── Persist active tab ───────────────────────────────────────────────────
   React.useEffect(() => {
-    localStorage.setItem('hive_active_tab', activeTab);
+    // Don't persist 'plans' tab — always return to analysis on refresh
+    if (activeTab !== 'plans') {
+      localStorage.setItem('hive_active_tab', activeTab);
+    }
   }, [activeTab]);
 
   // ── Persist input files (debounced) ─────────────────────────────────────
@@ -129,6 +164,22 @@ export default function Home() {
       setTimeout(() => executionPanelRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
   }, [status]);
+
+  // ── Handle checkout success query param ─────────────────────────────────
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      const plan = params.get('plan');
+      toast.success(`Successfully subscribed to the ${plan || 'new'} plan!`, 'Subscription Active');
+      fetchTokenInfo();
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('checkout') === 'canceled') {
+      toast.warning('Checkout was canceled.', 'Checkout Canceled');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Main analysis handler ────────────────────────────────────────────────
   const handleAnalysis = async (uploadedFiles: { htf: File; mid: File; ltf: File }) => {
@@ -171,6 +222,9 @@ export default function Home() {
           `${data.signal_type || data.signal || 'WAIT'} signal generated for ${data.asset_name || data.asset || 'your asset'}.`,
           'Analysis Complete'
         );
+
+        // Refresh token info after successful analysis
+        fetchTokenInfo();
       } else {
         throw new Error('No data returned from analysis');
       }
@@ -185,6 +239,16 @@ export default function Home() {
         errorData?.message ||
         error.message      ||
         'Unknown error occurred';
+
+      // Check if it's a token limit error
+      if (error.response?.status === 429 && errorData?.tokenInfo) {
+        setTokenInfo(errorData.tokenInfo);
+        toast.error(
+          `Daily limit reached (${errorData.tokenInfo.used}/${errorData.tokenInfo.limit}). Upgrade your plan for more analyses.`,
+          'Limit Reached'
+        );
+        return;
+      }
 
       if (errorMessage.includes('N8N Webhook URL is not configured') || errorMessage.includes('Check .env.local')) {
         toast.error('The N8N Webhook URL is not configured. Please check your .env.local file.', 'Configuration Error', Infinity);
@@ -248,12 +312,22 @@ export default function Home() {
         onTabChange={setActiveTab}
         mobilePanelView={mobilePanelView}
         onMobilePanelChange={setMobilePanelView}
+        tokenInfo={tokenInfo}
+        onTokenRefresh={fetchTokenInfo}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 p-4 md:p-6 overflow-hidden">
 
-        {activeTab === 'analysis' ? (
+        {activeTab === 'plans' ? (
+          <div className="h-full max-w-[1200px] mx-auto w-full animate-in fade-in duration-500">
+            <PlansPage
+              tokenInfo={tokenInfo}
+              onBack={() => setActiveTab('analysis')}
+              onTokenRefresh={fetchTokenInfo}
+            />
+          </div>
+        ) : activeTab === 'analysis' ? (
           <div className="flex flex-col lg:flex-row gap-6 h-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
 
             {/* Left Panel: Chart Input */}

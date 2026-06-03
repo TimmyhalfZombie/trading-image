@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { canAnalyze, incrementUsage } from '@/lib/tokens';
 import sharp from 'sharp';
 
 // Increase Vercel function timeout to the maximum allowed on Hobby tier (60 seconds)
@@ -69,6 +70,18 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { error: 'Unauthorized: Please log in to analyze charts.' },
                 { status: 401 }
+            );
+        }
+
+        // ── 2b. Check daily token limit ─────────────────────────────────
+        const tokenCheck = await canAnalyze(user.id);
+        if (!tokenCheck.canAnalyze) {
+            return NextResponse.json(
+                {
+                    error: `Daily limit reached (${tokenCheck.limit} analyses/day on ${tokenCheck.planName} plan). Upgrade for more.`,
+                    tokenInfo: tokenCheck,
+                },
+                { status: 429 }
             );
         }
 
@@ -268,6 +281,13 @@ export async function POST(request: Request) {
 
                 if (dbError) {
                     log.error('DB insert failed:', dbError.message);
+                }
+
+                // ── 10b. Increment daily usage token ─────────────────────
+                try {
+                    await incrementUsage(user.id);
+                } catch (usageErr) {
+                    log.error('Failed to increment usage:', usageErr);
                 }
             } catch (dbEx) {
                 log.error('DB error:', dbEx);

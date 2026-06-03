@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "HIVE — Smart Trading",
+  title: "HIVE",
   description: "AI-powered chart analysis for smarter trading decisions",
 };
 

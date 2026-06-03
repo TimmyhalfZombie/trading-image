@@ -1,20 +1,35 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, History, Sun, Moon, LogOut, Menu, X, User, Upload, Zap } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { LayoutDashboard, History, Sun, Moon, Menu, Upload, Zap } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { useTheme } from './ThemeProvider';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { UserSidebar } from './UserSidebar';
+import { TokenBadge } from './TokenBadge';
 
-interface HeaderProps {
-    activeTab: 'analysis' | 'history';
-    onTabChange: (tab: 'analysis' | 'history') => void;
-    mobilePanelView: 'upload' | 'result';
-    onMobilePanelChange: (view: 'upload' | 'result') => void;
+interface TokenInfo {
+    plan: string;
+    planName: string;
+    limit: number;
+    used: number;
+    remaining: number;
+    canAnalyze: boolean;
+    cancelAtPeriodEnd: boolean;
+    currentPeriodEnd: string | null;
 }
 
-export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelChange }: HeaderProps) {
+interface HeaderProps {
+    activeTab: 'analysis' | 'history' | 'plans';
+    onTabChange: (tab: 'analysis' | 'history' | 'plans') => void;
+    mobilePanelView: 'upload' | 'result';
+    onMobilePanelChange: (view: 'upload' | 'result') => void;
+    tokenInfo: TokenInfo | null;
+    onTokenRefresh: () => void;
+}
+
+export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelChange, tokenInfo, onTokenRefresh }: HeaderProps) {
     const { theme, toggleTheme } = useTheme();
     const router = useRouter();
     const supabase = createClient();
@@ -43,6 +58,10 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
         await supabase.auth.signOut();
         router.push('/login');
     };
+
+    const initials = userData?.name
+        ? userData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        : '?';
 
     return (
         <>
@@ -179,149 +198,53 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                     </nav>
 
                     {/* Desktop Actions */}
-                    <div className="hidden md:flex items-center gap-3">
-                        {/* Theme Toggle */}
-                        <button
-                            onClick={toggleTheme}
-                            className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
-                            style={{
-                                backgroundColor: 'var(--nav-bg)',
-                                border: '1px solid var(--border-light)',
-                                color: 'var(--text-secondary)',
-                            }}
-                            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                        >
-                            {theme === 'dark' ? (
-                                <Sun className="w-4 h-4" />
-                            ) : (
-                                <Moon className="w-4 h-4" />
-                            )}
-                        </button>
+                    <div className="hidden md:flex items-center gap-2.5">
+                        {/* Token Badge */}
+                        {tokenInfo && (
+                            <TokenBadge used={tokenInfo.used} limit={tokenInfo.limit} />
+                        )}
 
-                        {/* Logout Button */}
+                        {/* User Avatar Button */}
                         <button
-                            onClick={handleLogout}
-                            className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer hover:bg-red-500/10 hover:text-red-500"
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer text-[11px] font-black"
                             style={{
-                                backgroundColor: 'var(--nav-bg)',
-                                border: '1px solid var(--border-light)',
-                                color: 'var(--text-secondary)',
+                                background: 'linear-gradient(135deg, #F59E0B, #EA580C)',
+                                color: '#fff',
+                                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
                             }}
-                            title="Sign Out"
+                            title="Profile & Settings"
                         >
-                            <LogOut className="w-4 h-4" />
+                            {initials}
                         </button>
                     </div>
 
-                    {/* Mobile Menu Toggle */}
+                    {/* Mobile User Avatar Button */}
                     <button
                         onClick={() => setIsSidebarOpen(true)}
-                        className="md:hidden w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer"
+                        className="md:hidden w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer text-[11px] font-black"
                         style={{
-                            backgroundColor: 'var(--nav-bg)',
-                            border: '1px solid var(--border-light)',
-                            color: 'var(--text-secondary)',
+                            background: 'linear-gradient(135deg, #F59E0B, #EA580C)',
+                            color: '#fff',
+                            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
                         }}
                     >
-                        <Menu className="w-4 h-4" />
+                        {initials}
                     </button>
                 </div>
             </header>
 
-            {/* Mobile Sidebar Overlay */}
-            {isSidebarOpen && (
-                <div className="fixed inset-0 z-50 md:hidden flex justify-end">
-                    {/* Backdrop */}
-                    <div 
-                        className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
-                        onClick={() => setIsSidebarOpen(false)}
-                    />
-                    
-                    {/* Sidebar */}
-                    <div 
-                        className="w-[280px] h-full shadow-2xl relative flex flex-col transition-transform duration-300 animate-in slide-in-from-right"
-                        style={{ backgroundColor: 'var(--surface)' }}
-                    >
-                        {/* Sidebar Header with User Data */}
-                        <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: 'var(--border-light)' }}>
-                            <div className="flex flex-col min-w-0 pr-2">
-                                <span className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-                                    {userData?.name || 'Trader'}
-                                </span>
-                                <span className="text-[11px] font-semibold truncate opacity-70" style={{ color: 'var(--text-secondary)' }}>
-                                    {userData?.email || 'No email'}
-                                </span>
-                            </div>
-                            <button
-                                onClick={() => setIsSidebarOpen(false)}
-                                className="p-2 rounded-full cursor-pointer transition-colors flex-shrink-0"
-                                style={{ color: 'var(--text-secondary)' }}
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        
-                        {/* Body / App Navigation Controls */}
-                        <div className="flex-1 overflow-y-auto p-5">
-                            <p className="text-[10px] uppercase font-bold tracking-wider mb-3 opacity-60" style={{ color: 'var(--text-secondary)' }}>
-                                Navigation
-                            </p>
-                            <div className="flex flex-col gap-2">
-                                <button
-                                    onClick={() => {
-                                        onTabChange('history');
-                                        setIsSidebarOpen(false);
-                                    }}
-                                    className={twMerge(
-                                        "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all duration-200 cursor-pointer",
-                                    )}
-                                    style={activeTab === 'history' ? {
-                                        backgroundColor: 'var(--nav-active-bg)',
-                                        color: 'var(--nav-active-text)',
-                                        boxShadow: `0 0 0 1px var(--nav-active-ring)`,
-                                    } : {
-                                        backgroundColor: 'var(--nav-bg)',
-                                        color: 'var(--text-secondary)',
-                                        border: '1px solid var(--border-light)'
-                                    }}
-                                >
-                                    <History className="w-4 h-4" />
-                                    History
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Sidebar Footer Actions */}
-                        <div className="p-5 border-t flex flex-col gap-3" style={{ borderColor: 'var(--border-light)' }}>
-                            <button
-                                onClick={() => { toggleTheme(); }}
-                                className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-                                style={{ 
-                                    backgroundColor: 'var(--nav-bg)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-light)'
-                                }}
-                            >
-                                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                                {theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                            </button>
-
-                            <button
-                                onClick={handleLogout}
-                                className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-                                style={{ 
-                                    backgroundColor: 'var(--loss-bg)',
-                                    color: 'var(--loss)',
-                                    border: '1px solid var(--loss-border)'
-                                }}
-                            >
-                                <LogOut className="w-4 h-4" />
-                                Sign Out
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Unified Sidebar (Desktop + Mobile) */}
+            <UserSidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                userData={userData}
+                tokenInfo={tokenInfo}
+                onLogout={handleLogout}
+                onThemeToggle={toggleTheme}
+                onNavigatePlans={() => onTabChange('plans')}
+                theme={theme}
+            />
         </>
     );
 }
