@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { verifyWebhookSignature } from '@/lib/stripe';
 
 export const dynamic = 'force-dynamic';
 
-// Use admin client for webhook (no user session)
 function getAdminClient() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
     if (!serviceKey) {
-        // Fall back to anon key with limited permissions
         return createAdminClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     }
     
@@ -19,157 +17,80 @@ function getAdminClient() {
 
 export async function POST(request: Request) {
     try {
-        if (!stripe) {
-            return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
-        }
-
-        const body = await request.text();
-        const signature = request.headers.get('stripe-signature');
+        const rawBody = await request.text();
+        const signature = request.headers.get('paymongo-signature');
 
         if (!signature) {
+            console.warn('[paymongo/webhook] Missing paymongo-signature header');
             return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
         }
 
-        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;
         if (!webhookSecret) {
-            console.error('[stripe/webhook] STRIPE_WEBHOOK_SECRET not set');
+            console.error('[paymongo/webhook] PAYMONGO_WEBHOOK_SECRET not set');
             return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
         }
 
-        let event;
-        try {
-            event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-        } catch (err: any) {
-            console.error('[stripe/webhook] Signature verification failed:', err.message);
+        // Verify webhook signature
+        const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret);
+        if (!isValid) {
+            console.error('[paymongo/webhook] Signature verification failed');
             return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
         }
 
+        const payload = JSON.parse(rawBody);
+        const eventType = payload?.data?.attributes?.type;
+        const eventData = payload?.data?.attributes?.data;
+
+        console.log(`[paymongo/webhook] Received event: ${eventType}`);
+
         const supabase = getAdminClient();
 
-        switch (event.type) {
-            case 'checkout.session.completed': {
-                const session = event.data.object;
-                const userId = session.metadata?.supabase_user_id;
-                const plan = session.metadata?.plan;
-                const subscriptionId = session.subscription as string;
-                const customerId = session.customer as string;
+        if (eventType === 'checkout_session.payment.paid') {
+            const checkoutSession = eventData;
+            const attributes = checkoutSession?.attributes;
+            const metadata = attributes?.metadata;
+            
+            const userId = metadata?.supabase_user_id;
+            const plan = metadata?.plan;
+            const customerId = metadata?.customer_id || null;
+            const checkoutSessionId = checkoutSession?.id;
 
-                if (!userId || !plan) {
-                    console.error('[stripe/webhook] Missing metadata in checkout session');
-                    break;
-                }
-
-                // Fetch subscription details for period dates
-                const sub = await stripe.subscriptions.retrieve(subscriptionId);
-
-                await supabase
-                    .from('user_subscriptions')
-                    .upsert({
-                        user_id: userId,
-                        plan,
-                        stripe_customer_id: customerId,
-                        stripe_subscription_id: subscriptionId,
-                        status: 'active',
-                        cancel_at_period_end: false,
-                        current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-                        current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-                        updated_at: new Date().toISOString(),
-                    }, { onConflict: 'user_id' });
-
-                console.log(`[stripe/webhook] User ${userId} subscribed to ${plan}`);
-                break;
+            if (!userId || !plan) {
+                console.error('[paymongo/webhook] Missing user_id or plan in checkout session metadata:', metadata);
+                return NextResponse.json({ error: 'Missing metadata' }, { status: 400 });
             }
 
-            case 'customer.subscription.updated': {
-                const sub = event.data.object;
-                const userId = sub.metadata?.supabase_user_id;
+            // Set plan active for 30 days (standard billing period)
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setDate(startDate.getDate() + 30);
 
-                if (!userId) {
-                    console.error('[stripe/webhook] Missing user_id in subscription metadata');
-                    break;
-                }
+            const { error } = await supabase
+                .from('user_subscriptions')
+                .upsert({
+                    user_id: userId,
+                    plan,
+                    stripe_customer_id: customerId, // reusing the column name
+                    stripe_subscription_id: checkoutSessionId, // store session ID to identify the transaction
+                    status: 'active',
+                    cancel_at_period_end: true, // One-time session automatically expires unless renewed manually
+                    current_period_start: startDate.toISOString(),
+                    current_period_end: endDate.toISOString(),
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'user_id' });
 
-                // Determine plan from price ID
-                const priceId = sub.items.data[0]?.price?.id;
-                let plan = 'free';
-                if (priceId === process.env.STRIPE_STARTER_PRICE_ID) plan = 'starter';
-                if (priceId === process.env.STRIPE_PRO_PRICE_ID) plan = 'pro';
-
-                const status = sub.status === 'active' ? 'active'
-                    : sub.status === 'past_due' ? 'past_due'
-                    : sub.status === 'canceled' ? 'canceled'
-                    : 'active';
-
-                await supabase
-                    .from('user_subscriptions')
-                    .update({
-                        plan,
-                        status,
-                        cancel_at_period_end: sub.cancel_at_period_end || false,
-                        current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-                        current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('user_id', userId);
-
-                console.log(`[stripe/webhook] Subscription updated for ${userId}: ${plan} (${status})`);
-                break;
+            if (error) {
+                console.error('[paymongo/webhook] Failed to upsert subscription:', error);
+                return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
             }
 
-            case 'customer.subscription.deleted': {
-                const sub = event.data.object;
-                const userId = sub.metadata?.supabase_user_id;
-
-                if (!userId) break;
-
-                // Revert to free plan
-                await supabase
-                    .from('user_subscriptions')
-                    .update({
-                        plan: 'free',
-                        status: 'active',
-                        stripe_subscription_id: null,
-                        cancel_at_period_end: false,
-                        current_period_start: null,
-                        current_period_end: null,
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('user_id', userId);
-
-                console.log(`[stripe/webhook] Subscription deleted for ${userId}, reverted to free`);
-                break;
-            }
-
-            case 'invoice.payment_failed': {
-                const invoice = event.data.object;
-                const subscriptionId = invoice.subscription as string;
-
-                if (subscriptionId) {
-                    const sub = await stripe.subscriptions.retrieve(subscriptionId);
-                    const userId = sub.metadata?.supabase_user_id;
-
-                    if (userId) {
-                        await supabase
-                            .from('user_subscriptions')
-                            .update({
-                                status: 'past_due',
-                                updated_at: new Date().toISOString(),
-                            })
-                            .eq('user_id', userId);
-
-                        console.log(`[stripe/webhook] Payment failed for ${userId}`);
-                    }
-                }
-                break;
-            }
-
-            default:
-                console.log(`[stripe/webhook] Unhandled event: ${event.type}`);
+            console.log(`[paymongo/webhook] Successfully activated ${plan} plan for user ${userId}`);
         }
 
         return NextResponse.json({ received: true });
-    } catch (error) {
-        console.error('[stripe/webhook] Error:', error);
-        return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
+    } catch (error: any) {
+        console.error('[paymongo/webhook] Error handling webhook:', error);
+        return NextResponse.json({ error: error.message || 'Webhook handler failed' }, { status: 500 });
     }
 }

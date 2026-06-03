@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { PLANS, type PlanType } from '@/lib/stripe';
+import { PLANS, type PlanType } from '@/lib/stripe'; // PayMongo-backed config
 
 export interface TokenInfo {
     plan: PlanType;

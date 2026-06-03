@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { stripe } from '@/lib/stripe';
+import { isPayMongoConfigured } from '@/lib/stripe';
 import { getUserPlan } from '@/lib/tokens';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
     try {
-        if (!stripe) {
+        if (!isPayMongoConfigured()) {
             return NextResponse.json(
-                { error: 'Stripe is not configured.' },
+                { error: 'Payment system is not configured.' },
                 { status: 500 }
             );
         }
@@ -30,12 +30,10 @@ export async function POST() {
             );
         }
 
-        // Cancel at period end — subscription continues until billing period ends
-        await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-            cancel_at_period_end: true,
-        });
+        // For PayMongo, we mark cancel_at_period_end in our DB
+        // The subscription stays active until the period ends
+        // We'll check this flag during webhook processing or via a cron
 
-        // Update local DB
         await supabase
             .from('user_subscriptions')
             .update({
@@ -50,7 +48,7 @@ export async function POST() {
             currentPeriodEnd: subscription.currentPeriodEnd,
         });
     } catch (error: any) {
-        console.error('[stripe/cancel] Error:', error);
+        console.error('[paymongo/cancel] Error:', error);
         return NextResponse.json(
             { error: error.message || 'Failed to cancel subscription.' },
             { status: 500 }
