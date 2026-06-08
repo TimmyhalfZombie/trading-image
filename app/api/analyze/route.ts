@@ -9,7 +9,7 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 // ─── Env helpers (server-only — no NEXT_PUBLIC_ prefix) ──────────────────────
-const getWebhookUrl = () => process.env['N8N_WEBHOOK_URL'] || 'http://localhost:5678/webhook/trading-analysis-v4';
+const getWebhookUrl = () => process.env['N8N_WEBHOOK_URL'] || 'http://localhost:5678/webhook/trading-signal-v6';
 const getWebhookSecret = () => process.env['N8N_WEBHOOK_SECRET'] || '';
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -75,7 +75,8 @@ export async function POST(request: Request) {
 
         // ── 2b. Check daily token limit ─────────────────────────────────
         const tokenCheck = await canAnalyze(user.id);
-        if (!tokenCheck.canAnalyze) {
+        // Bypassed daily limit check to remove analysis limitation
+        if (false && !tokenCheck.canAnalyze) {
             return NextResponse.json(
                 {
                     error: `Daily limit reached (${tokenCheck.limit} analyses/day on ${tokenCheck.planName} plan). Upgrade for more.`,
@@ -110,6 +111,12 @@ export async function POST(request: Request) {
         const n8nFormData = new FormData();
         n8nFormData.append('user_id', user.id);
 
+        const userAgent = request.headers.get('user-agent') || '';
+        const isMobile = /mobile|android|iphone|ipad|phone/i.test(userAgent);
+        const sourceVal = isMobile ? 'mobile' : 'desktop';
+        n8nFormData.append('device_type', sourceVal);
+        n8nFormData.append('source', sourceVal);
+
         type NormalizedImage = { buffer: Buffer; filename: string; mimetype: string };
         const normalized: Record<string, NormalizedImage | null> = {
             image_htf: null,
@@ -119,14 +126,17 @@ export async function POST(request: Request) {
 
         const normalizeAndAppend = async (key: string, file: FormDataEntryValue | null) => {
             if (!file || !(file instanceof File)) return;
+            const n8nKey = key === 'image_htf' ? 'chart_4h' 
+                         : key === 'image_mid' ? 'chart_1h' 
+                         : 'chart_15m';
             try {
                 const result = await normalizeChartOrientation(file);
                 normalized[key] = result;
                 const blob = new Blob([new Uint8Array(result.buffer)], { type: result.mimetype });
-                n8nFormData.append(key, blob, result.filename);
+                n8nFormData.append(n8nKey, blob, result.filename);
             } catch (err) {
                 log.warn(`Failed to normalize ${key}, using original:`, err);
-                n8nFormData.append(key, file, file.name);
+                n8nFormData.append(n8nKey, file, file.name);
             }
         };
 

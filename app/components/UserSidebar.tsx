@@ -138,6 +138,8 @@ export function UserSidebar({
 
                 {/* Plan & Usage Section */}
                 <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                    {/* Current Plan hidden from UI, keeping code */}
+                    {/*
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
                             Current Plan
@@ -155,8 +157,10 @@ export function UserSidebar({
                             {tokenInfo?.planName || 'Free'}
                         </span>
                     </div>
+                    */}
 
-                    {/* Usage Bar */}
+                    {/* Usage Bar (commented out to hide from UI) */}
+                    {/*
                     {tokenInfo && (
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -202,10 +206,12 @@ export function UserSidebar({
                             )}
                         </div>
                     )}
+                    */}
                 </div>
 
-                {/* Navigation */}
+                {/* Navigation (Spacer / Hidden from UI) */}
                 <div className="flex-1 overflow-y-auto px-5 py-4">
+                    {/*
                     <p className="text-[10px] uppercase font-bold tracking-wider mb-3 opacity-60" style={{ color: 'var(--text-secondary)' }}>
                         Manage
                     </p>
@@ -229,6 +235,7 @@ export function UserSidebar({
                             <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
                         </button>
                     </div>
+                    */}
                 </div>
 
                 {/* Footer Actions */}

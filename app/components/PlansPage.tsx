@@ -25,7 +25,7 @@ const plans = [
     {
         id: 'free' as const,
         name: 'Free',
-        price: '$0',
+        price: '₱0',
         period: 'forever',
         dailyLimit: 3,
         icon: Sparkles,
@@ -40,7 +40,7 @@ const plans = [
     {
         id: 'starter' as const,
         name: 'Starter',
-        price: '$4.99',
+        price: '₱249',
         period: '/month',
         dailyLimit: 10,
         icon: Zap,
@@ -57,7 +57,7 @@ const plans = [
     {
         id: 'pro' as const,
         name: 'Pro',
-        price: '$9.99',
+        price: '₱499',
         period: '/month',
         dailyLimit: 30,
         icon: Crown,
@@ -157,7 +157,7 @@ export function PlansPage({ tokenInfo, onBack, onTokenRefresh }: PlansPageProps)
 
             {/* Plans Grid */}
             <div className="flex-1 overflow-y-auto pb-4 flex flex-col justify-center">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-7xl mx-auto pt-4">
                     {plans.map((plan) => {
                         const isCurrentPlan = currentPlan === plan.id;
                         const Icon = plan.icon;
@@ -169,22 +169,20 @@ export function PlansPage({ tokenInfo, onBack, onTokenRefresh }: PlansPageProps)
                                 className="relative rounded-2xl p-5 flex flex-col transition-all duration-300 hover:translate-y-[-2px]"
                                 style={{
                                     backgroundColor: 'var(--surface)',
-                                    border: isCurrentPlan
+                                    border: plan.popular
                                         ? `2px solid ${plan.color}`
-                                        : plan.popular
-                                            ? `2px solid ${plan.color}60`
+                                        : isCurrentPlan
+                                            ? `1.5px dashed var(--border)`
                                             : '1px solid var(--border-light)',
-                                    boxShadow: isCurrentPlan
-                                        ? `0 0 0 1px ${plan.color}20, 0 8px 32px ${plan.color}10`
-                                        : plan.popular
-                                            ? `0 0 0 1px ${plan.color}15, 0 8px 32px ${plan.color}12`
-                                            : undefined,
+                                    boxShadow: plan.popular
+                                        ? `0 12px 24px -10px ${plan.color}40, 0 4px 12px -5px ${plan.color}20`
+                                        : undefined,
                                 }}
                             >
                                 {/* Popular Badge */}
-                                {plan.popular && !isCurrentPlan && (
+                                {plan.popular && (
                                     <div
-                                        className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest text-white"
+                                        className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest text-white shadow-sm"
                                         style={{ background: plan.gradient }}
                                     >
                                         Most Popular
@@ -192,10 +190,14 @@ export function PlansPage({ tokenInfo, onBack, onTokenRefresh }: PlansPageProps)
                                 )}
 
                                 {/* Current Plan Badge */}
-                                {isCurrentPlan && (
+                                {isCurrentPlan && !plan.popular && (
                                     <div
-                                        className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest text-white"
-                                        style={{ background: plan.gradient }}
+                                        className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border"
+                                        style={{
+                                            backgroundColor: 'var(--bg-secondary)',
+                                            borderColor: 'var(--border-light)',
+                                            color: 'var(--text-secondary)',
+                                        }}
                                     >
                                         Current Plan
                                     </div>
@@ -306,7 +308,7 @@ export function PlansPage({ tokenInfo, onBack, onTokenRefresh }: PlansPageProps)
                 {/* Cancel Notice */}
                 {tokenInfo?.cancelAtPeriodEnd && tokenInfo.currentPeriodEnd && (
                     <div
-                        className="max-w-4xl mx-auto mt-4 flex items-center gap-2 p-3 rounded-xl text-xs"
+                        className="max-w-7xl mx-auto mt-4 flex items-center gap-2 p-3 rounded-xl text-xs"
                         style={{
                             backgroundColor: 'var(--loss-bg)',
                             color: 'var(--loss)',
@@ -323,7 +325,7 @@ export function PlansPage({ tokenInfo, onBack, onTokenRefresh }: PlansPageProps)
                 )}
 
                 {/* Info Footer */}
-                <div className="max-w-4xl mx-auto mt-6 text-center">
+                <div className="max-w-7xl mx-auto mt-6 text-center">
                     <p className="text-[10px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
                         All plans include access to AI-powered chart analysis. Daily limits reset at midnight UTC.
                         <br />

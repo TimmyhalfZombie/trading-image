@@ -73,12 +73,17 @@ export type PlanType = keyof typeof PLANS;
  * Create a PayMongo customer.
  */
 export async function createCustomer(email: string, name: string, metadata?: Record<string, string>) {
+    const nameParts = name.trim().split(/\s+/);
+    const firstName = nameParts[0] || 'Trader';
+    const lastName = nameParts.slice(1).join(' ') || 'User';
+
     return paymongoRequest('/customers', 'POST', {
         data: {
             attributes: {
                 email,
-                first_name: name.split(' ')[0] || name,
-                last_name: name.split(' ').slice(1).join(' ') || '',
+                first_name: firstName,
+                last_name: lastName,
+                phone: '+639000000000',
                 metadata: metadata || {},
             },
         },

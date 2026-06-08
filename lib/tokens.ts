@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { PLANS, type PlanType } from '@/lib/stripe'; // PayMongo-backed config
+import { PLANS, type PlanType } from '@/lib/paymongo'; // PayMongo-backed config
 
 export interface TokenInfo {
     plan: PlanType;
@@ -117,7 +117,7 @@ export async function canAnalyze(userId: string): Promise<TokenInfo> {
         limit,
         used,
         remaining,
-        canAnalyze: remaining > 0,
+        canAnalyze: true, // Daily limitation bypassed (originally: remaining > 0)
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
         currentPeriodEnd: subscription.currentPeriodEnd,
     };

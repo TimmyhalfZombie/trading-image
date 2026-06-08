@@ -199,10 +199,12 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
 
                     {/* Desktop Actions */}
                     <div className="hidden md:flex items-center gap-2.5">
-                        {/* Token Badge */}
+                        {/* Token Badge (commented out to hide from UI) */}
+                        {/*
                         {tokenInfo && (
                             <TokenBadge used={tokenInfo.used} limit={tokenInfo.limit} />
                         )}
+                        */}
 
                         {/* User Avatar Button */}
                         <button

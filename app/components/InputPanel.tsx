@@ -20,7 +20,7 @@ export interface ChartUrls {
 interface InputPanelProps {
     files: InputPanelFiles;
     onFilesChange: (files: InputPanelFiles) => void;
-    onAnalyze: (files: { htf: File, mid: File, ltf: File }) => void;
+    onAnalyze: (files: { htf: File | null, mid: File | null, ltf: File | null }) => void;
     onClearAll?: () => void;
     isLoading?: boolean;
     hasAnalyzed?: boolean;
@@ -150,7 +150,7 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
 }
 
 export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoading = false, hasAnalyzed = false, chartUrls }: InputPanelProps) {
-    const isReady = files.htf && files.mid && files.ltf;
+    const isReady = !!(files.htf || files.mid || files.ltf);
     const hasAnyFile = files.htf || files.mid || files.ltf;
     const hasAnyChartUrl = chartUrls?.htf || chartUrls?.mid || chartUrls?.ltf;
     const canAnalyze = isReady && !isLoading;
@@ -158,16 +158,16 @@ export function InputPanel({ files, onFilesChange, onAnalyze, onClearAll, isLoad
     const handleAnalyze = () => {
         if (canAnalyze) {
             onAnalyze({
-                htf: files.htf!,
-                mid: files.mid!,
-                ltf: files.ltf!
+                htf: files.htf,
+                mid: files.mid,
+                ltf: files.ltf
             });
         }
     };
 
     return (
         <div
-            className="flex flex-col h-full rounded-2xl shadow-sm overflow-hidden flex-shrink-0 transition-colors duration-300"
+            className="panel-container flex flex-col h-full rounded-2xl shadow-sm overflow-hidden flex-shrink-0 transition-colors duration-300"
             style={{
                 backgroundColor: 'var(--surface)',
                 border: '1px solid var(--border-light)',

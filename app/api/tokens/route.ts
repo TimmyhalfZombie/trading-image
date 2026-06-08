@@ -14,6 +14,17 @@ export async function GET() {
         }
 
         const tokenInfo = await canAnalyze(user.id);
+        
+        // MOCK PLAN FOR TESTING (Change to 'free', 'starter', 'pro', or keep null for production DB)
+        const MOCK_PLAN: 'free' | 'starter' | 'pro' | null = null; 
+        
+        if (MOCK_PLAN) {
+            tokenInfo.plan = MOCK_PLAN;
+            tokenInfo.planName = MOCK_PLAN === 'starter' ? 'Starter' : MOCK_PLAN === 'pro' ? 'Pro' : 'Free';
+            tokenInfo.limit = MOCK_PLAN === 'starter' ? 10 : MOCK_PLAN === 'pro' ? 30 : 3;
+            tokenInfo.remaining = Math.max(0, tokenInfo.limit - tokenInfo.used);
+            tokenInfo.canAnalyze = true; // Bypassed daily limitation (originally: tokenInfo.remaining > 0)
+        }
 
         return NextResponse.json(tokenInfo);
     } catch (error) {

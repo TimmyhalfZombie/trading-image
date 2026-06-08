@@ -146,6 +146,8 @@ export default function Home() {
         if (files.ltf) filesData.ltf = { name: files.ltf.name, data: await fileToBase64(files.ltf) };
         if (Object.keys(filesData).length > 0) {
           localStorage.setItem('hive_input_files', JSON.stringify(filesData));
+        } else {
+          localStorage.removeItem('hive_input_files');
         }
       } catch (e) {
         console.warn('Storage quota exceeded, images not saved', e);
@@ -169,9 +171,57 @@ export default function Home() {
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
-      const plan = params.get('plan');
-      toast.success(`Successfully subscribed to the ${plan || 'new'} plan!`, 'Subscription Active');
-      fetchTokenInfo();
+      const plan = params.get('plan') || 'starter';
+      
+      const syncLocalSubscription = async () => {
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (user) {
+            console.log('[Dev Sync] Triggering local webhook subscription sync...');
+            const res = await fetch('/api/stripe/webhook', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'paymongo-signature': 'bypass-dev'
+              },
+              body: JSON.stringify({
+                data: {
+                  attributes: {
+                    type: 'checkout_session.payment.paid',
+                    data: {
+                      id: `cs_local_${Date.now()}`,
+                      attributes: {
+                        metadata: {
+                          supabase_user_id: user.id,
+                          plan: plan
+                        }
+                      }
+                    }
+                  }
+                }
+              })
+            });
+            
+            if (res.ok) {
+              console.log('[Dev Sync] Webhook sync successful!');
+              fetchTokenInfo();
+            } else {
+              console.error('[Dev Sync] Webhook sync failed status:', res.status);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to sync local subscription:', err);
+        }
+      };
+
+      toast.success(`Successfully subscribed to the ${plan} plan!`, 'Subscription Active');
+      
+      // Auto-sync database state for local development
+      syncLocalSubscription();
+
       // Clean up URL
       window.history.replaceState({}, '', window.location.pathname);
     } else if (params.get('checkout') === 'canceled') {
@@ -182,16 +232,16 @@ export default function Home() {
   }, []);
 
   // ── Main analysis handler ────────────────────────────────────────────────
-  const handleAnalysis = async (uploadedFiles: { htf: File; mid: File; ltf: File }) => {
+  const handleAnalysis = async (uploadedFiles: { htf: File | null; mid: File | null; ltf: File | null }) => {
     setIsProcessing(true);
     setStatus('analyzing');
     setAnalysisResult(undefined);
 
     try {
       const formData = new FormData();
-      formData.append('image_htf', uploadedFiles.htf);
-      formData.append('image_mid', uploadedFiles.mid);
-      formData.append('image_ltf', uploadedFiles.ltf);
+      if (uploadedFiles.htf) formData.append('image_htf', uploadedFiles.htf);
+      if (uploadedFiles.mid) formData.append('image_mid', uploadedFiles.mid);
+      if (uploadedFiles.ltf) formData.append('image_ltf', uploadedFiles.ltf);
 
       const response = await axios.post('/api/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -244,7 +294,7 @@ export default function Home() {
       if (error.response?.status === 429 && errorData?.tokenInfo) {
         setTokenInfo(errorData.tokenInfo);
         toast.error(
-          `Daily limit reached (${errorData.tokenInfo.used}/${errorData.tokenInfo.limit}). Upgrade your plan for more analyses.`,
+          `Daily limit reached (${errorData.tokenInfo.used}/${errorData.tokenInfo.limit}). Please try again tomorrow.`,
           'Limit Reached'
         );
         return;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isPayMongoConfigured } from '@/lib/stripe';
+import { isPayMongoConfigured } from '@/lib/paymongo';
 import { getUserPlan } from '@/lib/tokens';
 
 export const dynamic = 'force-dynamic';

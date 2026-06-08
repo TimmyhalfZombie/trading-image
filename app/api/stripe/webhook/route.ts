@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { verifyWebhookSignature } from '@/lib/stripe';
+import { verifyWebhookSignature } from '@/lib/paymongo';
 
 export const dynamic = 'force-dynamic';
 
 function getAdminClient() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
+
     if (!serviceKey) {
         return createAdminClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     }
-    
+
     return createAdminClient(url, serviceKey);
 }
 
@@ -31,11 +31,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
         }
 
-        // Verify webhook signature
+        // Verify webhook signature (bypassed in development mode for easier manual testing)
         const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret);
         if (!isValid) {
-            console.error('[paymongo/webhook] Signature verification failed');
-            return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+            if (process.env.NODE_ENV === 'development') {
+                console.warn('[paymongo/webhook] Webhook signature verification failed, but bypassed because NODE_ENV is development.');
+            } else {
+                console.error('[paymongo/webhook] Signature verification failed');
+                return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+            }
         }
 
         const payload = JSON.parse(rawBody);
@@ -50,7 +54,7 @@ export async function POST(request: Request) {
             const checkoutSession = eventData;
             const attributes = checkoutSession?.attributes;
             const metadata = attributes?.metadata;
-            
+
             const userId = metadata?.supabase_user_id;
             const plan = metadata?.plan;
             const customerId = metadata?.customer_id || null;
@@ -74,7 +78,7 @@ export async function POST(request: Request) {
                     stripe_customer_id: customerId, // reusing the column name
                     stripe_subscription_id: checkoutSessionId, // store session ID to identify the transaction
                     status: 'active',
-                    cancel_at_period_end: true, // One-time session automatically expires unless renewed manually
+                    cancel_at_period_end: false, // Active and auto-renewing by default; only true when cancelled explicitly
                     current_period_start: startDate.toISOString(),
                     current_period_end: endDate.toISOString(),
                     updated_at: new Date().toISOString(),
