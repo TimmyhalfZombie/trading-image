@@ -69,7 +69,9 @@ export default function Home() {
   React.useEffect(() => {
     const savedResult = localStorage.getItem('hive_analysis_result');
     const savedTab    = localStorage.getItem('hive_active_tab');
-    const savedFiles  = localStorage.getItem('hive_input_files');
+
+    // Clean up legacy keys that cause QuotaExceeded errors
+    localStorage.removeItem('hive_input_files');
 
     if (savedResult) {
       try {
@@ -81,29 +83,6 @@ export default function Home() {
       } catch (e) {
         console.error('Failed to recover analysis state', e);
         toast.warning('Could not restore your last analysis session.', 'Session Restore Failed');
-      }
-    }
-
-    if (savedFiles) {
-      try {
-        const parsed = JSON.parse(savedFiles);
-        const base64ToFile = (base64: string, filename: string): File => {
-          const arr  = base64.split(',');
-          const mime = arr[0].match(/:(.*?);/)![1];
-          const bstr = atob(arr[1]);
-          let n = bstr.length;
-          const u8arr = new Uint8Array(n);
-          while (n--) u8arr[n] = bstr.charCodeAt(n);
-          return new File([u8arr], filename, { type: mime });
-        };
-        setFiles({
-          htf: parsed.htf ? base64ToFile(parsed.htf.data, parsed.htf.name) : null,
-          mid: parsed.mid ? base64ToFile(parsed.mid.data, parsed.mid.name) : null,
-          ltf: parsed.ltf ? base64ToFile(parsed.ltf.data, parsed.ltf.name) : null,
-        });
-      } catch (e) {
-        console.error('Failed to recover input files', e);
-        toast.warning('Could not restore previously uploaded chart images.', 'Files Not Restored');
       }
     }
 
@@ -128,37 +107,7 @@ export default function Home() {
     }
   }, [activeTab]);
 
-  // ── Persist input files (debounced) ─────────────────────────────────────
-  React.useEffect(() => {
-    const saveFiles = async () => {
-      const fileToBase64 = (file: File): Promise<string> =>
-        new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload  = () => resolve(reader.result as string);
-          reader.onerror = (err) => reject(err);
-        });
 
-      try {
-        const filesData: Record<string, { name: string; data: string }> = {};
-        if (files.htf) filesData.htf = { name: files.htf.name, data: await fileToBase64(files.htf) };
-        if (files.mid) filesData.mid = { name: files.mid.name, data: await fileToBase64(files.mid) };
-        if (files.ltf) filesData.ltf = { name: files.ltf.name, data: await fileToBase64(files.ltf) };
-        if (Object.keys(filesData).length > 0) {
-          localStorage.setItem('hive_input_files', JSON.stringify(filesData));
-        } else {
-          localStorage.removeItem('hive_input_files');
-        }
-      } catch (e) {
-        console.warn('Storage quota exceeded, images not saved', e);
-        toast.warning('Storage quota exceeded. Chart images could not be saved.', 'Storage Full');
-      }
-    };
-
-    const id = setTimeout(saveFiles, 500);
-    return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [files]);
 
   // ── Auto-scroll to result panel on mobile ───────────────────────────────
   React.useEffect(() => {
