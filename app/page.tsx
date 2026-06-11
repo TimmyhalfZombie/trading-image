@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useToast } from './components/Toast';
 import { type Trade } from './components/HistoryTable';
-import axios from 'axios';
 import { Header } from './components/Header';
 import { InputPanel, InputPanelFiles } from './components/InputPanel';
 import { ExecutionPanel } from './components/ExecutionPanel';
@@ -38,6 +37,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'analysis' | 'history' | 'plans'>('analysis');
   const [mobilePanelView, setMobilePanelView] = useState<'upload' | 'result'>('upload');
   const executionPanelRef = React.useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [files, setFiles] = useState<InputPanelFiles>({ htf: null, mid: null, ltf: null });
@@ -181,6 +181,72 @@ export default function Home() {
   }, []);
 
   // ── Main analysis handler ────────────────────────────────────────────────
+  // ── Robust fetch with retry (replaces axios to fix mobile stale-connection bugs) ──
+  const fetchWithRetry = useCallback(async (
+    url: string,
+    options: RequestInit,
+    maxRetries = 3
+  ): Promise<Response> => {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Fresh AbortController per attempt so a timed-out attempt doesn't
+        // poison the next one (root cause of the "need to reload" bug)
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        // 65s client timeout — slightly above Vercel's 60s so we receive
+        // the server's own 504 instead of a raw network error
+        const timeoutId = setTimeout(() => controller.abort(), 65_000);
+
+        const res = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        // Don't retry 4xx — those are user/config errors, not transient
+        if (res.status >= 400 && res.status < 500) return res;
+
+        // Retry 502/503/504 (n8n down, gateway error, Vercel timeout)
+        if (res.status >= 500 && attempt < maxRetries) {
+          lastError = new Error(`Server responded ${res.status}`);
+          const backoff = Math.min(2000 * Math.pow(2, attempt - 1), 8000);
+          toast.warning(
+            `Server error (${res.status}). Retrying in ${backoff / 1000}s… (attempt ${attempt}/${maxRetries})`,
+            'Retrying'
+          );
+          await new Promise(r => setTimeout(r, backoff));
+          continue;
+        }
+
+        return res;
+      } catch (err: any) {
+        lastError = err;
+
+        // AbortError = timeout; TypeError = network failure (mobile sleep/switch)
+        const isRetryable = err.name === 'AbortError' ||
+                            err.name === 'TypeError' ||
+                            err.message?.includes('fetch') ||
+                            err.message?.includes('network');
+
+        if (isRetryable && attempt < maxRetries) {
+          const backoff = Math.min(2000 * Math.pow(2, attempt - 1), 8000);
+          toast.warning(
+            `Connection lost. Retrying in ${backoff / 1000}s… (attempt ${attempt}/${maxRetries})`,
+            'Retrying'
+          );
+          await new Promise(r => setTimeout(r, backoff));
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw lastError || new Error('All retry attempts exhausted');
+  }, [toast]);
+
   const handleAnalysis = async (uploadedFiles: { htf: File | null; mid: File | null; ltf: File | null }) => {
     setIsProcessing(true);
     setStatus('analyzing');
@@ -192,13 +258,24 @@ export default function Home() {
       if (uploadedFiles.mid) formData.append('image_mid', uploadedFiles.mid);
       if (uploadedFiles.ltf) formData.append('image_ltf', uploadedFiles.ltf);
 
-      const response = await axios.post('/api/analyze', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 120000, // 2-min hard timeout — prevents infinite hang when n8n is down
+      const response = await fetchWithRetry('/api/analyze', {
+        method: 'POST',
+        body: formData,
+        // NOTE: Do NOT set Content-Type — browser auto-sets multipart boundary
       });
 
-      if (response.data) {
-        const data = Array.isArray(response.data) ? response.data[0] : response.data;
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        // Build a structured error so the catch block can handle it
+        const err: any = new Error(responseData?.error || `Server error ${response.status}`);
+        err.status = response.status;
+        err.data = responseData;
+        throw err;
+      }
+
+      if (responseData) {
+        const data = Array.isArray(responseData) ? responseData[0] : responseData;
 
         if (data.error) throw new Error(data.error);
 
@@ -232,15 +309,17 @@ export default function Home() {
       console.error('Analysis Failed:', error);
       setStatus('awaiting');
 
-      const errorData    = error.response?.data;
+      const errorData = error.data;
       const errorMessage: string =
         errorData?.error   ||
         errorData?.message ||
         error.message      ||
         'Unknown error occurred';
 
+      const httpStatus = error.status || 0;
+
       // Check if it's a token limit error
-      if (error.response?.status === 429 && errorData?.tokenInfo) {
+      if (httpStatus === 429 && errorData?.tokenInfo) {
         setTokenInfo(errorData.tokenInfo);
         toast.error(
           `Daily limit reached (${errorData.tokenInfo.used}/${errorData.tokenInfo.limit}). Please try again tomorrow.`,
@@ -251,32 +330,29 @@ export default function Home() {
 
       if (errorMessage.includes('N8N Webhook URL is not configured') || errorMessage.includes('Check .env.local')) {
         toast.error('The N8N Webhook URL is not configured. Please check your .env.local file.', 'Configuration Error', Infinity);
+      } else if (error.name === 'AbortError') {
+        toast.error('The request timed out. The analysis server may be overloaded. Please try again.', 'Request Timed Out');
       } else if (
+        error.name === 'TypeError' ||
         errorMessage.includes('Network Error') ||
         errorMessage.includes('ECONNREFUSED') ||
-        error.code === 'ECONNREFUSED' ||
-        error.code === 'ERR_NETWORK'
+        errorMessage.includes('fetch')
       ) {
-        toast.error('Cannot reach the analysis server. Make sure n8n is running and accessible.', 'Connection Error');
-      } else if (
-        error.code === 'ECONNABORTED' ||
-        errorMessage.toLowerCase().includes('timeout') ||
-        errorMessage.includes('408')
-      ) {
-        toast.error('The request timed out after 2 minutes. n8n may be overloaded or unreachable.', 'Request Timed Out');
+        toast.error('Cannot reach the analysis server after multiple attempts. Check your connection and try again.', 'Connection Error');
       } else if (errorMessage.includes('Respond Immediately') || errorMessage.includes('Workflow was started')) {
         toast.error('N8N is set to "Respond Immediately". Change the webhook to "Using Respond to Webhook Node".', 'N8N Config Error', Infinity);
       } else if (errorMessage.includes('No data returned') || errorMessage.includes('Empty response')) {
         toast.error('The server returned an empty response. Please try again.', 'Empty Response');
-      } else if (error.response?.status === 401) {
+      } else if (httpStatus === 401) {
         toast.error('You must be logged in to run an analysis.', 'Unauthorized');
-      } else if (error.response?.status >= 500) {
-        toast.error(`Server error (${error.response.status}). Check your n8n workflow and API logs.`, 'Server Error');
+      } else if (httpStatus >= 500) {
+        toast.error(`Server error (${httpStatus}). Check your n8n workflow and API logs.`, 'Server Error');
       } else {
         toast.error(errorMessage, 'Analysis Failed');
       }
     } finally {
       setIsProcessing(false);
+      abortRef.current = null;
     }
   };
 

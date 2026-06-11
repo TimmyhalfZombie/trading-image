@@ -148,7 +148,7 @@ export async function POST(request: Request) {
 
         // ── 6. Forward to n8n (with auth + timeout) ───────────────────────
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 115_000); // 115 s server-side timeout
+        const timeout = setTimeout(() => controller.abort(), 50_000); // 50s — must finish before Vercel's 60s limit
 
         const webhookSecret = getWebhookSecret();
         const headers: Record<string, string> = {};
