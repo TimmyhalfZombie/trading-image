@@ -8,6 +8,7 @@ import { InputPanel, InputPanelFiles } from './components/InputPanel';
 import { ExecutionPanel } from './components/ExecutionPanel';
 import { HistoryTable } from './components/HistoryTable';
 import { PlansPage } from './components/PlansPage';
+import { LiveMarket } from './components/LiveMarket';
 
 interface AnalysisResult {
   signal: 'BUY' | 'SELL' | 'WAIT' | 'NEUTRAL';
@@ -19,6 +20,91 @@ interface AnalysisResult {
   chartHtfUrl?: string | null;
   chartMidUrl?: string | null;
   chartLtfUrl?: string | null;
+
+  // New fields from n8n workflow response
+  setup_type?: string;
+  setup_model?: string;
+  entry_price?: number;
+  tp1?: number;
+  tp2?: number;
+  tp3_runner?: number;
+  tp1_action?: string;
+  tp2_action?: string;
+  tp3_action?: string;
+  rr_ratio?: string;
+  rr_to_tp2?: string;
+  rr_to_tp3?: string;
+  volatility_level?: string;
+  news_sentiment?: string;
+  news_summary?: string;
+  active_session?: string;
+  active_killzone?: string;
+  pht_time?: string;
+  wait_reason?: string;
+  failed_timeframe?: string;
+  failed_candle?: string;
+  failed_step?: string;
+  next_step?: string;
+  recheck_after?: string;
+  overall_chart_summary?: string;
+  y_axis_mismatch?: boolean;
+  price_source?: string;
+  price_source_reason?: string;
+  confidence_breakdown?: string;
+  math_check?: string;
+
+  ict_pre_analysis?: {
+    midnight_open_price?: number;
+    daily_bias?: string;
+    price_position?: string;
+    asian_range_high?: number;
+    asian_range_low?: number;
+    pdh?: number;
+    pdl?: number;
+    judas_swing_detected?: boolean;
+    judas_swing_direction?: string;
+    judas_swing_sweep_price?: number;
+    ote_zone_low?: number;
+    ote_zone_high?: number;
+    po3_phase?: string;
+    smt_divergence_detected?: boolean;
+    smt_divergence_type?: string;
+    analysis?: string;
+  };
+
+  gate1_4h?: {
+    trend?: string;
+    bos_confirmed?: boolean;
+    bos_direction?: string;
+    nearest_ob_price?: number;
+    fvg_range?: string;
+    gate_passed?: boolean;
+    gate_fail_reason?: string;
+    analysis?: string;
+  };
+
+  gate2_1h?: {
+    aligns_with_4h?: boolean;
+    choch_observed?: boolean;
+    choch_direction?: string;
+    premium_or_discount?: string;
+    gate_passed?: boolean;
+    gate_fail_reason?: string;
+    analysis?: string;
+  };
+
+  gate3_15m?: {
+    liquidity_sweep_occurred?: boolean;
+    sweep_direction?: string;
+    sweep_price?: number;
+    mss_confirmed?: boolean;
+    mss_direction?: string;
+    price_in_ote_zone?: boolean;
+    entry_ob_price?: number;
+    gate_passed?: boolean;
+    gate_fail_reason?: string;
+    analysis?: string;
+  };
 }
 
 interface TokenInfo {
@@ -34,7 +120,7 @@ interface TokenInfo {
 
 export default function Home() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'analysis' | 'history' | 'plans'>('analysis');
+  const [activeTab, setActiveTab] = useState<'analysis' | 'history' | 'plans' | 'market'>('analysis');
   const [mobilePanelView, setMobilePanelView] = useState<'upload' | 'result'>('upload');
   const executionPanelRef = React.useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -86,7 +172,7 @@ export default function Home() {
       }
     }
 
-    if (savedTab === 'analysis' || savedTab === 'history') {
+    if (savedTab === 'analysis' || savedTab === 'history' || savedTab === 'market') {
       setActiveTab(savedTab);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,6 +192,7 @@ export default function Home() {
       localStorage.setItem('hive_active_tab', activeTab);
     }
   }, [activeTab]);
+
 
 
 
@@ -247,7 +334,7 @@ export default function Home() {
     throw lastError || new Error('All retry attempts exhausted');
   }, [toast]);
 
-  const handleAnalysis = async (uploadedFiles: { htf: File | null; mid: File | null; ltf: File | null }) => {
+  const handleAnalysis = async (uploadedFiles: { htf: File | string | null; mid: File | string | null; ltf: File | string | null }) => {
     setIsProcessing(true);
     setStatus('analyzing');
     setAnalysisResult(undefined);
@@ -289,6 +376,42 @@ export default function Home() {
           chartHtfUrl: data.chart_htf_url ?? null,
           chartMidUrl: data.chart_mid_url ?? null,
           chartLtfUrl: data.chart_ltf_url ?? null,
+
+          // Map new analytical output fields
+          setup_type:            data.setup_type || data.setup_model || 'No ICT Setup',
+          setup_model:           data.setup_model || data.setup_type || 'No ICT Setup',
+          entry_price:           data.entry_price || 0,
+          tp1:                   data.tp1 || 0,
+          tp2:                   data.tp2 || 0,
+          tp3_runner:            data.tp3_runner || 0,
+          tp1_action:            data.tp1_action || '',
+          tp2_action:            data.tp2_action || '',
+          tp3_action:            data.tp3_action || '',
+          rr_ratio:              data.rr_ratio || '0',
+          rr_to_tp2:             data.rr_to_tp2 || '0',
+          rr_to_tp3:             data.rr_to_tp3 || '0',
+          volatility_level:      data.volatility_level || 'NORMAL',
+          news_sentiment:        data.news_sentiment || 'NEUTRAL',
+          news_summary:          data.news_summary || '',
+          active_session:        data.active_session || '',
+          active_killzone:       data.active_killzone || 'NONE',
+          pht_time:              data.pht_time || '',
+          wait_reason:           data.wait_reason || 'none',
+          failed_timeframe:      data.failed_timeframe || 'none',
+          failed_candle:         data.failed_candle || 'none',
+          failed_step:           data.failed_step || 'none',
+          next_step:             data.next_step || 'none',
+          recheck_after:         data.recheck_after || '',
+          overall_chart_summary: data.overall_chart_summary || '',
+          y_axis_mismatch:       data.y_axis_mismatch || false,
+          price_source:          data.price_source || 'UNKNOWN',
+          price_source_reason:   data.price_source_reason || '',
+          confidence_breakdown:  data.confidence_breakdown || '',
+          math_check:            data.math_check || '',
+          ict_pre_analysis:      data.ict_pre_analysis || {},
+          gate1_4h:              data.gate1_4h || {},
+          gate2_1h:              data.gate2_1h || {},
+          gate3_15m:             data.gate3_15m || {},
         });
 
         setStatus('completed');
@@ -353,6 +476,28 @@ export default function Home() {
     } finally {
       setIsProcessing(false);
       abortRef.current = null;
+    }
+  };
+
+  // ── Handle snapshot taken from live market ──────────────────────────────────
+  const handleSnapshotTaken = (fileOrUrl: File | string) => {
+    let targetSlot: 'htf' | 'mid' | 'ltf' | null = null;
+    if (!files.htf) targetSlot = 'htf';
+    else if (!files.mid) targetSlot = 'mid';
+    else if (!files.ltf) targetSlot = 'ltf';
+
+    if (targetSlot) {
+      setFiles(prev => ({
+        ...prev,
+        [targetSlot!]: fileOrUrl
+      }));
+      setActiveTab('analysis');
+      setMobilePanelView('upload');
+      
+      const slotName = targetSlot === 'htf' ? 'Higher Timeframe' : targetSlot === 'mid' ? 'Intermediate Timeframe' : 'Lower Timeframe';
+      toast.success(`Loaded chart screenshot into ${slotName}!`, 'Snapshot Loaded');
+    } else {
+      toast.error('All timeframe slots are currently full. Please clear a slot first.', 'Slots Full');
     }
   };
 
@@ -439,6 +584,10 @@ export default function Home() {
               <ExecutionPanel status={status} result={analysisResult} />
             </div>
 
+          </div>
+        ) : activeTab === 'market' ? (
+          <div className="h-full max-w-[1600px] mx-auto w-full animate-in fade-in duration-500">
+            <LiveMarket onSnapshotTaken={handleSnapshotTaken} />
           </div>
         ) : (
           <div className="h-full max-w-[1200px] mx-auto w-full animate-in fade-in duration-500">

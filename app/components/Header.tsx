@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { LayoutDashboard, History, Sun, Moon, Menu, Upload, Zap } from 'lucide-react';
+import { LayoutDashboard, History, TrendingUp, Sun, Moon, Menu, Upload, Zap } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { useTheme } from './ThemeProvider';
 import { createClient } from '@/lib/supabase/client';
@@ -21,8 +21,8 @@ interface TokenInfo {
 }
 
 interface HeaderProps {
-    activeTab: 'analysis' | 'history' | 'plans';
-    onTabChange: (tab: 'analysis' | 'history' | 'plans') => void;
+    activeTab: 'analysis' | 'history' | 'plans' | 'market';
+    onTabChange: (tab: 'analysis' | 'history' | 'plans' | 'market') => void;
     mobilePanelView: 'upload' | 'result';
     onMobilePanelChange: (view: 'upload' | 'result') => void;
     tokenInfo: TokenInfo | null;
@@ -151,6 +151,21 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                             <History className="w-3.5 h-3.5" />
                             History
                         </button>
+                        <button
+                            onClick={() => onTabChange('market')}
+                            className={twMerge(
+                                "px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-2 tracking-wide cursor-pointer",
+                                activeTab === 'market' ? "shadow-sm" : "hover:opacity-80"
+                            )}
+                            style={activeTab === 'market' ? {
+                                backgroundColor: 'var(--nav-active-bg)',
+                                color: 'var(--nav-active-text)',
+                                boxShadow: `0 0 0 1px var(--nav-active-ring)`,
+                            } : { color: 'var(--text-tertiary)' }}
+                        >
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            Live Market
+                        </button>
                     </nav>
 
                     {/* Mobile Navigation (Upload / Result) */}
@@ -167,7 +182,7 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                                 onMobilePanelChange('upload');
                             }}
                             className={twMerge(
-                                "px-4 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 flex items-center justify-center tracking-wide cursor-pointer min-w-[70px]",
+                                "px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 flex items-center justify-center tracking-wide cursor-pointer min-w-[55px]",
                                 mobilePanelView === 'upload' && activeTab === 'analysis' ? "shadow-sm" : "hover:opacity-80"
                             )}
                             style={mobilePanelView === 'upload' && activeTab === 'analysis' ? {
@@ -184,7 +199,7 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                                 onMobilePanelChange('result');
                             }}
                             className={twMerge(
-                                "px-4 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 flex items-center justify-center tracking-wide cursor-pointer min-w-[70px]",
+                                "px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 flex items-center justify-center tracking-wide cursor-pointer min-w-[55px]",
                                 mobilePanelView === 'result' && activeTab === 'analysis' ? "shadow-sm" : "hover:opacity-80"
                             )}
                             style={mobilePanelView === 'result' && activeTab === 'analysis' ? {
@@ -194,6 +209,20 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                             } : { color: 'var(--text-tertiary)' }}
                         >
                             Result
+                        </button>
+                        <button
+                            onClick={() => onTabChange('market')}
+                            className={twMerge(
+                                "px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 flex items-center justify-center tracking-wide cursor-pointer min-w-[55px]",
+                                activeTab === 'market' ? "shadow-sm" : "hover:opacity-80"
+                            )}
+                            style={activeTab === 'market' ? {
+                                backgroundColor: 'var(--nav-active-bg)',
+                                color: 'var(--nav-active-text)',
+                                boxShadow: `0 0 0 1px var(--nav-active-ring)`,
+                            } : { color: 'var(--text-tertiary)' }}
+                        >
+                            Market
                         </button>
                     </nav>
 

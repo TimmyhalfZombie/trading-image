@@ -26,15 +26,18 @@ const log = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function normalizeChartOrientation(
-    file: File
+    fileOrBuffer: File | Buffer,
+    filename: string
 ): Promise<{ buffer: Buffer; filename: string; mimetype: string }> {
-    const inputBuffer = Buffer.from(await file.arrayBuffer());
+    const inputBuffer = Buffer.isBuffer(fileOrBuffer)
+        ? fileOrBuffer
+        : Buffer.from(await (fileOrBuffer as any).arrayBuffer());
     const image = sharp(inputBuffer);
     const metadata = await image.metadata();
     const w = metadata.width ?? 0;
     const h = metadata.height ?? 0;
 
-    log.info(`${file.name}: ${w}x${h} (${h > w ? 'portrait → landscape' : 'landscape'})`);
+    log.info(`${filename}: ${w}x${h} (${h > w ? 'portrait → landscape' : 'landscape'})`);
 
     const outputBuffer = await (h > w ? image.rotate(90) : image)
         .toFormat('jpeg', { quality: 92 })
@@ -42,7 +45,7 @@ async function normalizeChartOrientation(
 
     return {
         buffer: outputBuffer,
-        filename: file.name.replace(/\.[^.]+$/, '') + '_normalized.jpg',
+        filename: filename.replace(/\.[^.]+$/, '') + '_normalized.jpg',
         mimetype: 'image/jpeg',
     };
 }
@@ -102,9 +105,9 @@ export async function POST(request: Request) {
         const ltf = formData.get('image_ltf');
 
         log.info('Files received:', {
-            htf: htf instanceof File ? `${htf.name} (${htf.size}b)` : 'Missing',
-            mid: mid instanceof File ? `${mid.name} (${mid.size}b)` : 'Missing',
-            ltf: ltf instanceof File ? `${ltf.name} (${ltf.size}b)` : 'Missing',
+            htf: htf instanceof File ? `${htf.name} (${htf.size}b)` : typeof htf === 'string' ? `URL: ${htf}` : 'Missing',
+            mid: mid instanceof File ? `${mid.name} (${mid.size}b)` : typeof mid === 'string' ? `URL: ${mid}` : 'Missing',
+            ltf: ltf instanceof File ? `${ltf.name} (${ltf.size}b)` : typeof ltf === 'string' ? `URL: ${ltf}` : 'Missing',
         });
 
         // ── 5. Normalize images & build n8n payload ───────────────────────
@@ -124,19 +127,46 @@ export async function POST(request: Request) {
             image_ltf: null,
         };
 
-        const normalizeAndAppend = async (key: string, file: FormDataEntryValue | null) => {
-            if (!file || !(file instanceof File)) return;
+        const normalizeAndAppend = async (key: string, fileOrUrl: FormDataEntryValue | null) => {
+            if (!fileOrUrl) return;
             const n8nKey = key === 'image_htf' ? 'chart_4h' 
                          : key === 'image_mid' ? 'chart_1h' 
                          : 'chart_15m';
             try {
-                const result = await normalizeChartOrientation(file);
+                let buffer: Buffer;
+                let filename = 'chart.png';
+                
+                if (typeof fileOrUrl === 'string' && fileOrUrl.startsWith('http')) {
+                    // Fetch image from URL server-side
+                    const res = await fetch(fileOrUrl, {
+                        referrerPolicy: 'no-referrer',
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        }
+                    });
+                    if (!res.ok) throw new Error(`Failed to fetch image from URL: ${res.status}`);
+                    buffer = Buffer.from(await res.arrayBuffer());
+                    filename = fileOrUrl.split('/').pop()?.split('?')[0] || 'chart_from_url.png';
+                    if (!filename.includes('.')) filename += '.png';
+                } else if (fileOrUrl instanceof File) {
+                    buffer = Buffer.from(await fileOrUrl.arrayBuffer());
+                    filename = fileOrUrl.name;
+                } else {
+                    return;
+                }
+
+                const result = await normalizeChartOrientation(buffer, filename);
                 normalized[key] = result;
                 const blob = new Blob([new Uint8Array(result.buffer)], { type: result.mimetype });
                 n8nFormData.append(n8nKey, blob, result.filename);
             } catch (err) {
-                log.warn(`Failed to normalize ${key}, using original:`, err);
-                n8nFormData.append(n8nKey, file, file.name);
+                log.warn(`Failed to process ${key}:`, err);
+                if (fileOrUrl instanceof File) {
+                    n8nFormData.append(n8nKey, fileOrUrl, fileOrUrl.name);
+                } else if (typeof fileOrUrl === 'string') {
+                    // If fetching fails, we pass the URL as text so n8n can try fetching it
+                    n8nFormData.append(n8nKey + '_url', fileOrUrl);
+                }
             }
         };
 
