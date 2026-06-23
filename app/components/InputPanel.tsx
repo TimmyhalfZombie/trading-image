@@ -244,14 +244,14 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
                     <div
                         {...getRootProps()}
                         className={twMerge(
-                            "flex-1 border-2 border-dashed rounded-t-xl transition-all duration-200 cursor-pointer flex flex-col items-center justify-center text-center p-3 relative group",
+                            "flex-1 border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer flex flex-col items-center justify-center text-center p-3 relative group",
                             disabled && "opacity-50 cursor-not-allowed pointer-events-none",
                         )}
                         style={{
                             borderLeftColor: isDragActive ? 'var(--accent)' : 'var(--border)',
                             borderRightColor: isDragActive ? 'var(--accent)' : 'var(--border)',
                             borderTopColor: isDragActive ? 'var(--accent)' : 'var(--border)',
-                            borderBottomColor: 'transparent',
+                            borderBottomColor: isDragActive ? 'var(--accent)' : 'var(--border)',
                             backgroundColor: isDragActive ? 'var(--accent-glow)' : 'transparent',
                         }}
                     >
@@ -278,7 +278,8 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
                         </div>
                     </div>
 
-                    {/* Link paste area at the bottom */}
+                    {/* Link paste area at the bottom - hidden but preserved as requested */}
+                    {/*
                     <div
                         className="flex items-center gap-2 px-2.5 py-2 rounded-b-xl border-2 border-dashed transition-all"
                         style={{
@@ -313,6 +314,7 @@ function SingleDropzone({ label, subLabel, file, onDrop, onRemove, disabled, cla
                             }}
                         />
                     </div>
+                    */}
                 </div>
             )}
         </div>

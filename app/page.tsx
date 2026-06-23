@@ -268,71 +268,30 @@ export default function Home() {
   }, []);
 
   // ── Main analysis handler ────────────────────────────────────────────────
-  // ── Robust fetch with retry (replaces axios to fix mobile stale-connection bugs) ──
+  // ── Robust fetch (tries only once) ──
   const fetchWithRetry = useCallback(async (
     url: string,
-    options: RequestInit,
-    maxRetries = 3
+    options: RequestInit
   ): Promise<Response> => {
-    let lastError: Error | null = null;
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Fresh AbortController per attempt so a timed-out attempt doesn't
-        // poison the next one (root cause of the "need to reload" bug)
-        const controller = new AbortController();
-        abortRef.current = controller;
+    // 65s client timeout — slightly above Vercel's 60s so we receive
+    // the server's own 504 instead of a raw network error
+    const timeoutId = setTimeout(() => controller.abort(), 65_000);
 
-        // 65s client timeout — slightly above Vercel's 60s so we receive
-        // the server's own 504 instead of a raw network error
-        const timeoutId = setTimeout(() => controller.abort(), 65_000);
-
-        const res = await fetch(url, {
-          ...options,
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        // Don't retry 4xx — those are user/config errors, not transient
-        if (res.status >= 400 && res.status < 500) return res;
-
-        // Retry 502/503/504 (n8n down, gateway error, Vercel timeout)
-        if (res.status >= 500 && attempt < maxRetries) {
-          lastError = new Error(`Server responded ${res.status}`);
-          const backoff = Math.min(2000 * Math.pow(2, attempt - 1), 8000);
-          toast.warning(
-            `Server error (${res.status}). Retrying in ${backoff / 1000}s… (attempt ${attempt}/${maxRetries})`,
-            'Retrying'
-          );
-          await new Promise(r => setTimeout(r, backoff));
-          continue;
-        }
-
-        return res;
-      } catch (err: any) {
-        lastError = err;
-
-        // AbortError = timeout; TypeError = network failure (mobile sleep/switch)
-        const isRetryable = err.name === 'AbortError' ||
-                            err.name === 'TypeError' ||
-                            err.message?.includes('fetch') ||
-                            err.message?.includes('network');
-
-        if (isRetryable && attempt < maxRetries) {
-          const backoff = Math.min(2000 * Math.pow(2, attempt - 1), 8000);
-          toast.warning(
-            `Connection lost. Retrying in ${backoff / 1000}s… (attempt ${attempt}/${maxRetries})`,
-            'Retrying'
-          );
-          await new Promise(r => setTimeout(r, backoff));
-          continue;
-        }
-        throw err;
-      }
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return res;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      throw err;
     }
-
-    throw lastError || new Error('All retry attempts exhausted');
-  }, [toast]);
+  }, []);
 
   const handleAnalysis = async (uploadedFiles: { htf: File | string | null; mid: File | string | null; ltf: File | string | null }) => {
     setIsProcessing(true);
@@ -454,22 +413,24 @@ export default function Home() {
       if (errorMessage.includes('N8N Webhook URL is not configured') || errorMessage.includes('Check .env.local')) {
         toast.error('The N8N Webhook URL is not configured. Please check your .env.local file.', 'Configuration Error', Infinity);
       } else if (error.name === 'AbortError') {
-        toast.error('The request timed out. The analysis server may be overloaded. Please try again.', 'Request Timed Out');
+        toast.error('The request timed out. The N8N workflow took too long to respond, which usually indicates the AI model node (e.g. Gemini/OpenAI) is experiencing high demand or service instability.', 'Request Timed Out');
       } else if (
         error.name === 'TypeError' ||
         errorMessage.includes('Network Error') ||
         errorMessage.includes('ECONNREFUSED') ||
         errorMessage.includes('fetch')
       ) {
-        toast.error('Cannot reach the analysis server after multiple attempts. Check your connection and try again.', 'Connection Error');
+        toast.error('Cannot reach the analysis server. Please check if your N8N service is online or if the server is experiencing high traffic.', 'Connection Error');
       } else if (errorMessage.includes('Respond Immediately') || errorMessage.includes('Workflow was started')) {
         toast.error('N8N is set to "Respond Immediately". Change the webhook to "Using Respond to Webhook Node".', 'N8N Config Error', Infinity);
-      } else if (errorMessage.includes('No data returned') || errorMessage.includes('Empty response')) {
-        toast.error('The server returned an empty response. Please try again.', 'Empty Response');
+      } else if (errorMessage.includes('No data returned') || errorMessage.includes('Empty response') || errorMessage.includes('empty response')) {
+        toast.error('The analysis service returned an empty response. This occurs when the N8N workflow fails midway—most commonly because the AI model node (e.g. Gemini/OpenAI) is experiencing high demand, rate limits, or temporary service unavailability.', 'Empty Response');
       } else if (httpStatus === 401) {
         toast.error('You must be logged in to run an analysis.', 'Unauthorized');
+      } else if (errorData?.error || errorData?.message) {
+        toast.error(errorMessage, 'Analysis Failed');
       } else if (httpStatus >= 500) {
-        toast.error(`Server error (${httpStatus}). Check your n8n workflow and API logs.`, 'Server Error');
+        toast.error(`Server error (${httpStatus}). The N8N workflow failed to execute, likely due to high demand, rate limits, or an error on the HTTP Request/AI node. Please check your N8N workflow logs.`, 'Server Error');
       } else {
         toast.error(errorMessage, 'Analysis Failed');
       }

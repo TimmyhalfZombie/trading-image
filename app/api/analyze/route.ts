@@ -50,6 +50,63 @@ async function normalizeChartOrientation(
     };
 }
 
+function extractErrorMessage(obj: any): string | null {
+    if (!obj) return null;
+    if (typeof obj === 'string') return obj;
+    
+    // Check direct fields
+    if (typeof obj.message === 'string' && obj.message) return obj.message;
+    if (typeof obj.error === 'string' && obj.error) return obj.error;
+    if (typeof obj.errorMessage === 'string' && obj.errorMessage) return obj.errorMessage;
+    if (typeof obj.description === 'string' && obj.description) return obj.description;
+    
+    // Check nested error object
+    if (obj.error && typeof obj.error === 'object') {
+        const msg = extractErrorMessage(obj.error);
+        if (msg) return msg;
+    }
+    
+    // Check nested reason object
+    if (obj.reason && typeof obj.reason === 'object') {
+        const msg = extractErrorMessage(obj.reason);
+        if (msg) return msg;
+    }
+
+    // Check nested details or other fields recursively for keywords
+    try {
+        for (const key of Object.keys(obj)) {
+            // Skip successful analysis keys to avoid matching trading terms as system errors
+            if (['reasoning', 'setup_type', 'setup_model', 'overall_chart_summary', 'signal', 'signal_type', 'asset_name', 'asset'].includes(key)) {
+                continue;
+            }
+            if (typeof obj[key] === 'string' && (
+                obj[key].toLowerCase().includes('unavailable') || 
+                obj[key].toLowerCase().includes('demand') || 
+                obj[key].toLowerCase().includes('limit') || 
+                obj[key].toLowerCase().includes('failed') || 
+                obj[key].toLowerCase().includes('error')
+            )) {
+                return obj[key];
+            }
+        }
+    } catch {}
+
+    // Fallback: search any string value in the object, excluding safe keys
+    try {
+        for (const key of Object.keys(obj)) {
+            if (['reasoning', 'setup_type', 'setup_model', 'overall_chart_summary', 'signal', 'signal_type', 'asset_name', 'asset'].includes(key)) {
+                continue;
+            }
+            if (typeof obj[key] === 'object' && obj[key] !== null) {
+                const nested = extractErrorMessage(obj[key]);
+                if (nested) return nested;
+            }
+        }
+    } catch {}
+    
+    return null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/analyze
 // ─────────────────────────────────────────────────────────────────────────────
@@ -198,13 +255,13 @@ export async function POST(request: Request) {
             clearTimeout(timeout);
             if (fetchErr.name === 'AbortError') {
                 return NextResponse.json(
-                    { error: 'The analysis timed out. Please try again.' },
+                    { error: 'The analysis timed out. The N8N workflow took too long to respond, which usually indicates the AI model node is experiencing high demand or service instability.' },
                     { status: 504 }
                 );
             }
             log.error('Failed to reach n8n:', fetchErr.message);
             return NextResponse.json(
-                { error: 'Cannot reach the analysis service.' },
+                { error: `Cannot reach the analysis service: ${fetchErr.message}` },
                 { status: 502 }
             );
         } finally {
@@ -216,10 +273,20 @@ export async function POST(request: Request) {
             const errorText = await response.text().catch(() => '');
             log.error('n8n error:', response.status, errorText);
 
-            // Generic error — never forward raw n8n internals
+            let errorMsg = 'The analysis service returned an error. Please try again.';
+            try {
+                const parsed = JSON.parse(errorText);
+                const msg = extractErrorMessage(parsed);
+                if (msg) errorMsg = msg;
+            } catch {
+                if (errorText && errorText.length < 200) {
+                    errorMsg = errorText;
+                }
+            }
+
             return NextResponse.json(
-                { error: 'The analysis service returned an error. Please try again.' },
-                { status: 502 }
+                { error: errorMsg },
+                { status: response.status }
             );
         }
 
@@ -229,7 +296,7 @@ export async function POST(request: Request) {
 
         if (!responseText) {
             return NextResponse.json(
-                { error: 'The analysis service returned an empty response.' },
+                { error: 'The analysis service returned an empty response. This occurs when the N8N workflow fails midway—most commonly because the AI model node (e.g. Gemini/OpenAI) is experiencing high demand, rate limits, or temporary service unavailability.' },
                 { status: 502 }
             );
         }
@@ -254,13 +321,28 @@ export async function POST(request: Request) {
         } catch {
             log.error('Failed to parse n8n JSON');
             return NextResponse.json(
-                { error: 'Invalid response from analysis service.' },
+                { error: 'The analysis service returned an invalid response. This typically happens if the N8N workflow crashes or encounters an error on the HTTP Request/AI node due to service limits or high demand.' },
                 { status: 502 }
             );
         }
 
         // ── 9. Upload chart images to Supabase Storage ───────────────────
         const result = Array.isArray(data) ? data[0] : data;
+
+        // Check if the parsed JSON itself contains an error message (e.g. rate limit, high demand, node failure)
+        const detectedError = extractErrorMessage(result);
+        if (detectedError && (
+            detectedError.toLowerCase().includes('unavailable') || 
+            detectedError.toLowerCase().includes('demand') || 
+            detectedError.toLowerCase().includes('limit') ||
+            detectedError.toLowerCase().includes('error') ||
+            (!result.signal && !result.signal_type && (result.message || result.errorMessage || result.description))
+        )) {
+            return NextResponse.json(
+                { error: detectedError },
+                { status: 502 }
+            );
+        }
 
         let chartPaths: Record<string, string | null> = {
             htf: null, mid: null, ltf: null,
@@ -367,11 +449,10 @@ export async function POST(request: Request) {
 
         return NextResponse.json(data);
 
-    } catch (error: unknown) {
-        // FIX #3: NEVER leak internal error details to the client
+    } catch (error: any) {
         log.error('Unhandled error in /api/analyze:', error);
         return NextResponse.json(
-            { error: 'Internal server error. Please try again later.' },
+            { error: error.message || 'Internal server error. Please try again later.' },
             { status: 500 }
         );
     }

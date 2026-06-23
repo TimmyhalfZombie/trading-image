@@ -106,7 +106,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
   const [progress, setProgress] = useState(100);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
-  const duration = toast.duration ?? 5000;
+  const duration = toast.duration ?? Infinity;
   const isSticky = duration === Infinity;
   const cfg = VARIANT_CONFIG[toast.variant];
 

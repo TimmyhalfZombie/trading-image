@@ -151,6 +151,7 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                             <History className="w-3.5 h-3.5" />
                             History
                         </button>
+                        {/* 
                         <button
                             onClick={() => onTabChange('market')}
                             className={twMerge(
@@ -166,6 +167,7 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                             <TrendingUp className="w-3.5 h-3.5" />
                             Live Market
                         </button>
+                        */}
                     </nav>
 
                     {/* Mobile Navigation (Upload / Result) */}
@@ -210,6 +212,7 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                         >
                             Result
                         </button>
+                        {/* 
                         <button
                             onClick={() => onTabChange('market')}
                             className={twMerge(
@@ -224,6 +227,7 @@ export function Header({ activeTab, onTabChange, mobilePanelView, onMobilePanelC
                         >
                             Market
                         </button>
+                        */}
                     </nav>
 
                     {/* Desktop Actions */}
