@@ -330,18 +330,23 @@ export async function POST(request: Request) {
         const result = Array.isArray(data) ? data[0] : data;
 
         // Check if the parsed JSON itself contains an error message (e.g. rate limit, high demand, node failure)
-        const detectedError = extractErrorMessage(result);
-        if (detectedError && (
-            detectedError.toLowerCase().includes('unavailable') || 
-            detectedError.toLowerCase().includes('demand') || 
-            detectedError.toLowerCase().includes('limit') ||
-            detectedError.toLowerCase().includes('error') ||
-            (!result.signal && !result.signal_type && (result.message || result.errorMessage || result.description))
-        )) {
-            return NextResponse.json(
-                { error: detectedError },
-                { status: 502 }
-            );
+        // BUT only if the response doesn't already contain a valid signal — otherwise
+        // trading terms like "demand zone", "limit order", "gate failed" trigger false positives
+        const hasValidSignal = result.signal || result.signal_type;
+        if (!hasValidSignal) {
+            const detectedError = extractErrorMessage(result);
+            if (detectedError && (
+                detectedError.toLowerCase().includes('unavailable') || 
+                detectedError.toLowerCase().includes('demand') || 
+                detectedError.toLowerCase().includes('limit') ||
+                detectedError.toLowerCase().includes('error') ||
+                (result.message || result.errorMessage || result.description)
+            )) {
+                return NextResponse.json(
+                    { error: detectedError },
+                    { status: 502 }
+                );
+            }
         }
 
         let chartPaths: Record<string, string | null> = {
