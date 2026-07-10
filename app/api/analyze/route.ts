@@ -167,6 +167,18 @@ export async function POST(request: Request) {
             ltf: ltf instanceof File ? `${ltf.name} (${ltf.size}b)` : typeof ltf === 'string' ? `URL: ${ltf}` : 'Missing',
         });
 
+        // ── 4b. Reject 0-byte files (common on mobile when File objects go stale) ──
+        const emptySlots: string[] = [];
+        if (htf instanceof File && htf.size === 0) emptySlots.push('HTF (4H)');
+        if (mid instanceof File && mid.size === 0) emptySlots.push('MID (1H)');
+        if (ltf instanceof File && ltf.size === 0) emptySlots.push('LTF (15M)');
+        if (emptySlots.length > 0) {
+            return NextResponse.json(
+                { error: `Empty image received for ${emptySlots.join(', ')}. This usually happens on mobile when the browser loses access to the selected file. Please re-select your chart images and try again.` },
+                { status: 400, headers: { 'Cache-Control': 'no-store' } }
+            );
+        }
+
         // ── 5. Normalize images & build n8n payload ───────────────────────
         const n8nFormData = new FormData();
         n8nFormData.append('user_id', user.id);
@@ -452,7 +464,10 @@ export async function POST(request: Request) {
             }
         }
 
-        return NextResponse.json(data);
+        const responseHeaders = {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+        };
+        return NextResponse.json(data, { headers: responseHeaders });
 
     } catch (error: any) {
         log.error('Unhandled error in /api/analyze:', error);

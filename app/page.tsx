@@ -268,30 +268,91 @@ export default function Home() {
   }, []);
 
   // ── Main analysis handler ────────────────────────────────────────────────
-  // ── Robust fetch (tries only once) ──
+  // ── Robust fetch with retry for transient network/server errors ──
+  const MAX_RETRIES = 2; // 3 total attempts
+
   const fetchWithRetry = useCallback(async (
     url: string,
     options: RequestInit
   ): Promise<Response> => {
-    const controller = new AbortController();
-    abortRef.current = controller;
+    let lastError: any = null;
 
-    // 65s client timeout — slightly above Vercel's 60s so we receive
-    // the server's own 504 instead of a raw network error
-    const timeoutId = setTimeout(() => controller.abort(), 65_000);
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-    try {
-      const res = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      return res;
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      throw err;
+      // 65s client timeout — slightly above Vercel's 60s so we receive
+      // the server's own 504 instead of a raw network error
+      const timeoutId = setTimeout(() => controller.abort(), 65_000);
+
+      try {
+        const res = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        // Only retry on 5xx server errors (n8n down, server crash)
+        // Do NOT retry 4xx — those are user/config errors
+        if (res.status >= 500 && attempt < MAX_RETRIES) {
+          lastError = new Error(`Server error ${res.status}`);
+          const backoffMs = (attempt + 1) * 1500; // 1.5s, 3s
+          toast.warning(
+            `Server returned ${res.status}. Retrying in ${backoffMs / 1000}s… (attempt ${attempt + 2}/${MAX_RETRIES + 1})`,
+            'Retrying'
+          );
+          await new Promise(r => setTimeout(r, backoffMs));
+          continue;
+        }
+
+        return res;
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        lastError = err;
+
+        // Don't retry if user aborted or it's the last attempt
+        if (err.name === 'AbortError' || attempt >= MAX_RETRIES) {
+          throw err;
+        }
+
+        // Retry on network errors (TypeError: Failed to fetch, etc.)
+        const backoffMs = (attempt + 1) * 1500; // 1.5s, 3s
+        toast.warning(
+          `Network error. Retrying in ${backoffMs / 1000}s… (attempt ${attempt + 2}/${MAX_RETRIES + 1})`,
+          'Retrying'
+        );
+        await new Promise(r => setTimeout(r, backoffMs));
+      }
     }
-  }, []);
+
+    // Should not reach here, but just in case
+    throw lastError || new Error('Failed after retries');
+  }, [toast]);
+
+  // ── Validate File objects haven't gone stale (common on mobile) ──
+  const validateFileIntegrity = async (
+    file: File | string | null,
+    label: string
+  ): Promise<boolean> => {
+    if (!file || typeof file === 'string') return true; // URLs are fine
+    try {
+      const buf = await file.arrayBuffer();
+      if (buf.byteLength === 0) {
+        toast.error(
+          `The ${label} image could not be read (0 bytes). Please re-select it.`,
+          'Stale Image'
+        );
+        return false;
+      }
+      return true;
+    } catch {
+      toast.error(
+        `The ${label} image is no longer accessible. This can happen on mobile if you switched apps. Please re-select it.`,
+        'Image Unreadable'
+      );
+      return false;
+    }
+  };
 
   const handleAnalysis = async (uploadedFiles: { htf: File | string | null; mid: File | string | null; ltf: File | string | null }) => {
     setIsProcessing(true);
@@ -299,6 +360,45 @@ export default function Home() {
     setAnalysisResult(undefined);
 
     try {
+      // ── Pre-flight: validate file integrity (catches stale mobile File objects) ──
+      const [htfOk, midOk, ltfOk] = await Promise.all([
+        validateFileIntegrity(uploadedFiles.htf, 'Higher Timeframe'),
+        validateFileIntegrity(uploadedFiles.mid, 'Intermediate'),
+        validateFileIntegrity(uploadedFiles.ltf, 'Lower Timeframe'),
+      ]);
+      if (!htfOk || !midOk || !ltfOk) {
+        setIsProcessing(false);
+        setStatus('awaiting');
+        return;
+      }
+
+      // ── Pre-flight: quick connectivity + auth check ──
+      try {
+        const preflight = await fetch('/api/tokens', {
+          method: 'GET',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(8000), // 8s max for pre-flight
+        });
+        if (preflight.status === 401) {
+          toast.error(
+            'Your session has expired. Please refresh the page and log in again.',
+            'Session Expired'
+          );
+          setIsProcessing(false);
+          setStatus('awaiting');
+          return;
+        }
+      } catch {
+        toast.error(
+          'Cannot reach the server. Please check your internet connection and try again.',
+          'Connection Failed'
+        );
+        setIsProcessing(false);
+        setStatus('awaiting');
+        return;
+      }
+
+      // ── Build FormData ──
       const formData = new FormData();
       if (uploadedFiles.htf) formData.append('image_htf', uploadedFiles.htf);
       if (uploadedFiles.mid) formData.append('image_mid', uploadedFiles.mid);
